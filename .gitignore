@@ -1,0 +1,19 @@
+# Dependencies & Build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+
+# Python cache & virtual environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local Database
+backend/healthcare.db

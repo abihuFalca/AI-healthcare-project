@@ -1,0 +1,1977 @@
+PRODUCT REQUIREMENTS DOCUMENT
+
+AI Early-Risk Detection & Patient Triage System
+
+Explainable, safety-first clinical decision support for early risk identification and patient prioritisation
+
+Field | Detail
+
+Field
+
+Detail
+
+Document version | v1.0 (Hackathon MVP baseline)
+
+Document version
+
+v1.0 (Hackathon MVP baseline)
+
+Date | 02 October 2026
+
+Date
+
+02 October 2026
+
+Status | Draft for review
+
+Status
+
+Draft for review
+
+Product type | Software-only web platform (clinical decision support & triage)
+
+Product type
+
+Software-only web platform (clinical decision support & triage)
+
+Target stack | Next.js (React) · Python FastAPI · PostgreSQL / Supabase · scikit-learn / XGBoost + SHAP
+
+Target stack
+
+Next.js (React) · Python FastAPI · PostgreSQL / Supabase · scikit-learn / XGBoost + SHAP
+
+Intended users | Patients, Healthcare Workers / Doctors, Administrators
+
+Intended users
+
+Patients, Healthcare Workers / Doctors, Administrators
+
+Regulatory & clinical positioningThis product is a clinical decision-support and triage-assistance tool. It does not diagnose disease and does not replace a qualified healthcare professional. All risk outputs are AI-assisted estimates; a healthcare worker retains final clinical responsibility.
+
+Regulatory & clinical positioning
+
+This product is a clinical decision-support and triage-assistance tool. It does not diagnose disease and does not replace a qualified healthcare professional. All risk outputs are AI-assisted estimates; a healthcare worker retains final clinical responsibility.
+
+Table of Contents
+
+1. Executive Summary
+
+Patients often delay seeking care because they cannot judge how serious their symptoms are, while overloaded clinicians struggle to identify which patients need attention first. This product lets a patient submit symptoms, history, risk factors and vitals; an AI pipeline then produces an explainable risk score and triage priority, which a healthcare worker reviews and confirms.
+
+The platform combines three layers: (1) an NLP layer that converts free-text symptoms into structured data, (2) an interpretable machine-learning model that estimates risk, and (3) a deterministic clinical safety-rule engine that guarantees emergency warning signs are never left to a probabilistic model or an LLM alone.
+
+1.1 Core Flow
+
+End-to-end flowPatient Registration/Login → Health Profile → Symptoms + History + Vitals → Emergency Safety Check → NLP Processing → Risk Prediction → Explainable AI → Triage Classification → Recommended Next Step → Healthcare Worker Review → Patient Follow-up / Monitoring
+
+End-to-end flow
+
+Patient Registration/Login → Health Profile → Symptoms + History + Vitals → Emergency Safety Check → NLP Processing → Risk Prediction → Explainable AI → Triage Classification → Recommended Next Step → Healthcare Worker Review → Patient Follow-up / Monitoring
+
+2. Problem Statement & Opportunity
+
+2.1 Problems
+
+Patients lack a structured, understandable way to gauge urgency; early warning signs are missed or over-reported.
+
+Clinicians have no consistent, data-driven prioritisation of incoming patients; high-risk cases can wait in the same queue as routine ones.
+
+Free-text symptom descriptions are unstructured and hard to use in analytics.
+
+Longitudinal change (e.g. rising blood pressure and heart rate) is rarely visualised in one place.
+
+Existing AI tools are often opaque; clinicians will not trust a score without reasons.
+
+2.2 Opportunity
+
+A transparent, role-aware triage assistant can shorten time-to-attention for high-risk patients, give patients clear next steps, and give clinicians an explainable, reviewable prioritised queue while keeping humans accountable for decisions.
+
+3. Goals, Non-Goals & Success Metrics
+
+3.1 Product Goals
+
+Deliver an end-to-end working prototype across all three roles (Patient, Healthcare Worker, Admin).
+
+Produce a risk score, risk level and triage recommendation for every submitted assessment.
+
+Provide a human-readable explanation (SHAP or equivalent) with every prediction.
+
+Guarantee deterministic emergency-sign detection before any AI scoring.
+
+Give clinicians a prioritised high-risk queue with review, notes and triage override.
+
+Enforce role-based access, consent, and audit logging from day one.
+
+3.2 Non-Goals (MVP)
+
+Diagnosing any disease or prescribing treatment.
+
+Replacing clinician judgement or acting as a regulated medical device.
+
+EHR/HIS integration, teleconsultation, wearables, voice/WhatsApp/IVR access.
+
+Email/SMS/push notifications (in-app only for MVP).
+
+Production-grade regulatory compliance (documented as a requirement for deployment).
+
+3.3 Success Metrics (Prototype Targets)
+
+Targets below are proposed prototype goals to be validated; they are not clinically established benchmarks.
+
+Area | Metric | Prototype target
+
+Area
+
+Metric
+
+Prototype target
+
+Functionality | Core flow demonstrable end-to-end for all 3 roles | 100% of Phase 1–4 stories
+
+Functionality
+
+Core flow demonstrable end-to-end for all 3 roles
+
+100% of Phase 1–4 stories
+
+Responsiveness | Assessment submit → result displayed | ≤ 5 seconds (p95)
+
+Responsiveness
+
+Assessment submit → result displayed
+
+≤ 5 seconds (p95)
+
+Safety | Emergency demo cases flagged by rule engine | 100% of defined test cases
+
+Safety
+
+Emergency demo cases flagged by rule engine
+
+100% of defined test cases
+
+Explainability | Predictions with ≥ 3 stored contributing factors | 100%
+
+Explainability
+
+Predictions with ≥ 3 stored contributing factors
+
+100%
+
+Model quality | Recall for HIGH class on held-out validation data | Reported and reviewed (target set by clinical advisor)
+
+Model quality
+
+Recall for HIGH class on held-out validation data
+
+Reported and reviewed (target set by clinical advisor)
+
+Security | Cross-patient data access in RBAC tests | 0 successful violations
+
+Security
+
+Cross-patient data access in RBAC tests
+
+0 successful violations
+
+Auditability | Sensitive actions captured in audit log | 100% of defined events
+
+Auditability
+
+Sensitive actions captured in audit log
+
+100% of defined events
+
+Usability | Patient completes assessment unaided in test sessions | ≥ 80% of test users
+
+Usability
+
+Patient completes assessment unaided in test sessions
+
+≥ 80% of test users
+
+4. Users & Roles
+
+Role | Description | Key needs | Must NOT be able to
+
+Role
+
+Description
+
+Key needs
+
+Must NOT be able to
+
+Patient | Individual seeking to understand health risk and next steps | Easy multi-step entry, clear result, explanation, history, notifications | Modify AI-generated risk results; view other patients' data
+
+Patient
+
+Individual seeking to understand health risk and next steps
+
+Easy multi-step entry, clear result, explanation, history, notifications
+
+Modify AI-generated risk results; view other patients' data
+
+Healthcare Worker / Doctor | Approved clinician reviewing patient assessments | Prioritised queue, patient history, AI reasoning, review tools, trends | Access unauthorised patients; alter the original AI prediction (they add a review/override alongside it)
+
+Healthcare Worker / Doctor
+
+Approved clinician reviewing patient assessments
+
+Prioritised queue, patient history, AI reasoning, review tools, trends
+
+Access unauthorised patients; alter the original AI prediction (they add a review/override alongside it)
+
+Admin | System operator | User and worker management, approvals, audit logs, config, model info, statistics | Directly edit historical AI predictions
+
+Admin
+
+System operator
+
+User and worker management, approvals, audit logs, config, model info, statistics
+
+Directly edit historical AI predictions
+
+4.1 Account States
+
+Patient accounts: Active / Deactivated. Healthcare-worker accounts: Pending → Approved → Active (admin verification required before full access). Admin accounts are provisioned by the system, not through self-registration.
+
+5. Scope & Phasing
+
+Phase | Focus | Deliverables
+
+Phase
+
+Focus
+
+Deliverables
+
+1 | Authentication | Patient register/login; healthcare worker login; admin login; role-based routing
+
+1
+
+Authentication
+
+Patient register/login; healthcare worker login; admin login; role-based routing
+
+2 | Patient | Profile, medical history, symptoms, vitals, assessment submission
+
+2
+
+Patient
+
+Profile, medical history, symptoms, vitals, assessment submission
+
+3 | AI | NLP symptom extraction, risk prediction, risk classification, explainable AI, safety rules
+
+3
+
+AI
+
+NLP symptom extraction, risk prediction, risk classification, explainable AI, safety rules
+
+4 | Doctor | Dashboard, patient list, high-risk queue, patient details, AI explanation, review system
+
+4
+
+Doctor
+
+Dashboard, patient list, high-risk queue, patient details, AI explanation, review system
+
+5 | Visualisation | Risk timeline, vital trends, dashboard statistics
+
+5
+
+Visualisation
+
+Risk timeline, vital trends, dashboard statistics
+
+6 | Security & Governance | RBAC, row-level security, audit logs, input validation, consent
+
+6
+
+Security & Governance
+
+RBAC, row-level security, audit logs, input validation, consent
+
+Priority legend used in this document: P0 = must have for demo; P1 = should have; P2 = nice to have / post-MVP.
+
+6. Functional Requirements
+
+6.1 Authentication & Registration
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+AUTH-1 | Login with email or phone plus password; options for Forgot Password, Create Patient Account and Healthcare Worker Login. | P0
+
+AUTH-1
+
+Login with email or phone plus password; options for Forgot Password, Create Patient Account and Healthcare Worker Login.
+
+P0
+
+AUTH-2 | Role-based redirect after login: Patient → /patient/dashboard, Healthcare Worker → /doctor/dashboard, Admin → /admin/dashboard. | P0
+
+AUTH-2
+
+Role-based redirect after login: Patient → /patient/dashboard, Healthcare Worker → /doctor/dashboard, Admin → /admin/dashboard.
+
+P0
+
+AUTH-3 | Patient registration: full name, email, phone, password, confirm password, date of birth, gender, preferred language, emergency contact. On success create patient profile and redirect to health-profile setup. | P0
+
+AUTH-3
+
+Patient registration: full name, email, phone, password, confirm password, date of birth, gender, preferred language, emergency contact. On success create patient profile and redirect to health-profile setup.
+
+P0
+
+AUTH-4 | Healthcare-worker registration: full name, email, phone, password, professional role, department, hospital/clinic, professional ID. Status starts as Pending; limited access until admin approval (Pending → Approved → Active). | P0
+
+AUTH-4
+
+Healthcare-worker registration: full name, email, phone, password, professional role, department, hospital/clinic, professional ID. Status starts as Pending; limited access until admin approval (Pending → Approved → Active).
+
+P0
+
+AUTH-5 | Forgot/reset password flow via authentication provider. | P1
+
+AUTH-5
+
+Forgot/reset password flow via authentication provider.
+
+P1
+
+AUTH-6 | Logout, session expiry and token invalidation; passwords hashed by the auth provider (never stored in plain text). | P0
+
+AUTH-6
+
+Logout, session expiry and token invalidation; passwords hashed by the auth provider (never stored in plain text).
+
+P0
+
+AUTH-7 | Deactivated accounts cannot log in. | P0
+
+AUTH-7
+
+Deactivated accounts cannot log in.
+
+P0
+
+6.2 Patient Features
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+PAT-1 | Dashboard: welcome message, current risk badge (LOW/MODERATE/HIGH), latest risk score, last assessment date, Start New Assessment button, health summary (age, BP, heart rate, SpO₂), recent assessments, link to full history. | P0
+
+PAT-1
+
+Dashboard: welcome message, current risk badge (LOW/MODERATE/HIGH), latest risk score, last assessment date, Start New Assessment button, health summary (age, BP, heart rate, SpO₂), recent assessments, link to full history.
+
+P0
+
+PAT-2 | Create and update health profile (demographics, height, weight, language, emergency contact). | P0
+
+PAT-2
+
+Create and update health profile (demographics, height, weight, language, emergency contact).
+
+P0
+
+PAT-3 | Manage medical history, current medications and risk factors. | P0
+
+PAT-3
+
+Manage medical history, current medications and risk factors.
+
+P0
+
+PAT-4 | View previous assessments and risk history/timeline. | P0
+
+PAT-4
+
+View previous assessments and risk history/timeline.
+
+P0
+
+PAT-5 | View in-app notifications (assessment completed, clinician review completed, follow-up recommended). | P0
+
+PAT-5
+
+View in-app notifications (assessment completed, clinician review completed, follow-up recommended).
+
+P0
+
+PAT-6 | Patients cannot edit AI-generated risk score, level, explanation or recommendation (enforced at API and database level). | P0
+
+PAT-6
+
+Patients cannot edit AI-generated risk score, level, explanation or recommendation (enforced at API and database level).
+
+P0
+
+PAT-7 | Settings: manage profile, notification preferences, account deactivation request. | P1
+
+PAT-7
+
+Settings: manage profile, notification preferences, account deactivation request.
+
+P1
+
+6.3 Assessment (Multi-Step Form)
+
+A consent screen and privacy notice must be accepted before the first assessment. The form is a seven-step wizard with progress indicator, back/next navigation and per-step validation.
+
+Step | Name | Inputs & behaviour
+
+Step
+
+Name
+
+Inputs & behaviour
+
+1 | Basic Information | Age, gender, height, weight. BMI is calculated automatically.
+
+1
+
+Basic Information
+
+Age, gender, height, weight. BMI is calculated automatically.
+
+2 | Symptoms | Option A: free-text natural language. Option B: structured checklist/search (fever, cough, chest discomfort, shortness of breath, headache, dizziness, fatigue, abdominal pain, vomiting, diarrhoea, etc.) with duration, severity and frequency. Both can be combined.
+
+2
+
+Symptoms
+
+Option A: free-text natural language. Option B: structured checklist/search (fever, cough, chest discomfort, shortness of breath, headache, dizziness, fatigue, abdominal pain, vomiting, diarrhoea, etc.) with duration, severity and frequency. Both can be combined.
+
+3 | Medical History | Diabetes, hypertension, heart disease, asthma, kidney disease, liver disease, previous stroke, cancer history, other conditions; a "None" option.
+
+3
+
+Medical History
+
+Diabetes, hypertension, heart disease, asthma, kidney disease, liver disease, previous stroke, cancer history, other conditions; a "None" option.
+
+4 | Medications | Name, dosage, frequency; multiple entries allowed.
+
+4
+
+Medications
+
+Name, dosage, frequency; multiple entries allowed.
+
+5 | Risk Factors | Smoking, alcohol use, family history, obesity, physical inactivity, previous medical events.
+
+5
+
+Risk Factors
+
+Smoking, alcohol use, family history, obesity, physical inactivity, previous medical events.
+
+6 | Vitals | Blood pressure, heart rate, SpO₂, temperature, respiratory rate, blood glucose. Range validation with warnings for unusual values.
+
+6
+
+Vitals
+
+Blood pressure, heart rate, SpO₂, temperature, respiratory rate, blood glucose. Range validation with warnings for unusual values.
+
+7 | Review | Read-only summary of all entries with an Analyze My Risk button.
+
+7
+
+Review
+
+Read-only summary of all entries with an Analyze My Risk button.
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+ASM-1 | Pre-fill assessment fields from the saved profile, history and medications; patient may confirm or change them for this assessment. | P0
+
+ASM-1
+
+Pre-fill assessment fields from the saved profile, history and medications; patient may confirm or change them for this assessment.
+
+P0
+
+ASM-2 | Hard-block physically impossible values; soft-warn on unusual-but-possible values (see Appendix A for proposed ranges, to be clinically reviewed). | P0
+
+ASM-2
+
+Hard-block physically impossible values; soft-warn on unusual-but-possible values (see Appendix A for proposed ranges, to be clinically reviewed).
+
+P0
+
+ASM-3 | Store immutable snapshots of history and risk factors with each assessment so past results remain reproducible. | P0
+
+ASM-3
+
+Store immutable snapshots of history and risk factors with each assessment so past results remain reproducible.
+
+P0
+
+ASM-4 | Save in-progress drafts so a patient can resume (optional). | P2
+
+ASM-4
+
+Save in-progress drafts so a patient can resume (optional).
+
+P2
+
+6.4 AI Processing Pipeline
+
+Pipeline orderPatient Input → Input Validation → Emergency Warning-Sign Check → NLP Symptom Extraction → Feature Engineering → Risk Prediction Model → Risk Score → Explainability Engine → Triage Engine → Recommendation Engine → Save Assessment → Notifications
+
+Pipeline order
+
+Patient Input → Input Validation → Emergency Warning-Sign Check → NLP Symptom Extraction → Feature Engineering → Risk Prediction Model → Risk Score → Explainability Engine → Triage Engine → Recommendation Engine → Save Assessment → Notifications
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+AI-1 | Emergency safety layer runs before normal scoring; if any warning sign is detected the patient sees an immediate-attention message and healthcare workers are notified. | P0
+
+AI-1
+
+Emergency safety layer runs before normal scoring; if any warning sign is detected the patient sees an immediate-attention message and healthcare workers are notified.
+
+P0
+
+AI-2 | NLP layer converts free text into structured output (symptoms list, duration, severity or "unknown"). It must not output diagnoses. | P0
+
+AI-2
+
+NLP layer converts free text into structured output (symptoms list, duration, severity or "unknown"). It must not output diagnoses.
+
+P0
+
+AI-3 | Feature engineering combines age, gender, BMI, symptoms, vitals, history, medications, risk factors and duration into a model-ready vector. | P0
+
+AI-3
+
+Feature engineering combines age, gender, BMI, symptoms, vitals, history, medications, risk factors and duration into a model-ready vector.
+
+P0
+
+AI-4 | Interpretable ML model (Logistic Regression, Random Forest or XGBoost) returns a calibrated risk probability, converted to a 0–100 score. | P0
+
+AI-4
+
+Interpretable ML model (Logistic Regression, Random Forest or XGBoost) returns a calibrated risk probability, converted to a 0–100 score.
+
+P0
+
+AI-5 | Risk level bands (configurable prototype values, not medically established): 0–39 LOW, 40–69 MODERATE, 70–100 HIGH. | P0
+
+AI-5
+
+Risk level bands (configurable prototype values, not medically established): 0–39 LOW, 40–69 MODERATE, 70–100 HIGH.
+
+P0
+
+AI-6 | Every prediction stores explanation records (feature, contribution, importance, explanation text) using SHAP or model-specific attribution. | P0
+
+AI-6
+
+Every prediction stores explanation records (feature, contribution, importance, explanation text) using SHAP or model-specific attribution.
+
+P0
+
+AI-7 | Triage engine maps risk plus safety rules to urgency; the final triage level is the more urgent of the model result and any rule result. | P0
+
+AI-7
+
+Triage engine maps risk plus safety rules to urgency; the final triage level is the more urgent of the model result and any rule result.
+
+P0
+
+AI-8 | Recommendation engine returns deterministic, templated next-step text per triage level. | P0
+
+AI-8
+
+Recommendation engine returns deterministic, templated next-step text per triage level.
+
+P0
+
+AI-9 | Each assessment stores model_version; predictions are never silently recomputed or overwritten. | P0
+
+AI-9
+
+Each assessment stores model_version; predictions are never silently recomputed or overwritten.
+
+P0
+
+AI-10 | Only the minimum necessary, de-identified data is sent to any external AI/NLP service; prefer local models for the prototype. | P0
+
+AI-10
+
+Only the minimum necessary, de-identified data is sent to any external AI/NLP service; prefer local models for the prototype.
+
+P0
+
+6.5 NLP Layer
+
+Example input: "I have been having chest discomfort for three hours and I am sweating."
+
+Expected structured output: symptoms = [chest discomfort, sweating]; duration = 3 hours; severity = unknown.
+
+Approach for MVP: rule/lexicon-based extraction with synonym mapping (e.g. "tight chest" → chest discomfort), negation handling ("no fever"), and duration parsing; optional light spaCy/transformer upgrade.
+
+Extracted symptoms are shown back to the patient for confirmation before analysis.
+
+Unrecognised text is retained verbatim for the clinician; the NLP layer never invents symptoms.
+
+Initial language support: English; multilingual NLP is a future feature (preferred language is captured now).
+
+6.6 Explainable AI
+
+Results must separate three kinds of information so users do not mistake model output for clinical judgement:
+
+Category | Meaning | UI treatment
+
+Category
+
+Meaning
+
+UI treatment
+
+Model-derived factors | Features the ML model weighted (e.g. elevated BP +0.21) | "AI-identified factors" with ranked importance (High/Medium/Low)
+
+Model-derived factors
+
+Features the ML model weighted (e.g. elevated BP +0.21)
+
+"AI-identified factors" with ranked importance (High/Medium/Low)
+
+Patient-provided information | Inputs entered or confirmed by the patient | "What you told us" section
+
+Patient-provided information
+
+Inputs entered or confirmed by the patient
+
+"What you told us" section
+
+Clinical review | Healthcare worker notes, confirmed/changed triage | Clearly labelled, attributed to clinician, timestamped
+
+Clinical review
+
+Healthcare worker notes, confirmed/changed triage
+
+Clearly labelled, attributed to clinician, timestamped
+
+Wording rule: the product says "AI identified an elevated risk pattern based on the information provided", never "AI diagnosed your condition".
+
+6.7 Triage & Recommendations
+
+Risk level | Triage urgency | Recommended next step
+
+Risk level
+
+Triage urgency
+
+Recommended next step
+
+LOW | Routine | Routine healthcare consultation / monitoring
+
+LOW
+
+Routine
+
+Routine healthcare consultation / monitoring
+
+MODERATE | Prompt | Prompt healthcare consultation
+
+MODERATE
+
+Prompt
+
+Prompt healthcare consultation
+
+HIGH | Immediate | Immediate clinical assessment
+
+HIGH
+
+Immediate
+
+Immediate clinical assessment
+
+Emergency sign detected | Emergency | Seek immediate medical attention now; do not rely on this application
+
+Emergency sign detected
+
+Emergency
+
+Seek immediate medical attention now; do not rely on this application
+
+Mandatory disclaimer (every result screen)This result is an AI-assisted risk assessment and does not constitute a medical diagnosis. A qualified healthcare professional should make the final decision. If you think you are having a medical emergency, contact local emergency services immediately.
+
+Mandatory disclaimer (every result screen)
+
+This result is an AI-assisted risk assessment and does not constitute a medical diagnosis. A qualified healthcare professional should make the final decision. If you think you are having a medical emergency, contact local emergency services immediately.
+
+6.8 Patient Result Page
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+RES-1 | Show large risk level badge with text label and icon (not colour alone), risk score, "Why?" factor list, recommended next step, disclaimer. | P0
+
+RES-1
+
+Show large risk level badge with text label and icon (not colour alone), risk score, "Why?" factor list, recommended next step, disclaimer.
+
+P0
+
+RES-2 | Actions: Contact Healthcare Facility, View My History. | P0
+
+RES-2
+
+Actions: Contact Healthcare Facility, View My History.
+
+P0
+
+RES-3 | For emergency-rule hits, replace the standard layout with a prominent emergency banner and clear instructions. | P0
+
+RES-3
+
+For emergency-rule hits, replace the standard layout with a prominent emergency banner and clear instructions.
+
+P0
+
+6.9 Healthcare Worker Features
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+DOC-1 | Dashboard: total patients, pending reviews, high-risk count, moderate-risk count, and a prioritised high-priority patient table (patient, risk, score, status). | P0
+
+DOC-1
+
+Dashboard: total patients, pending reviews, high-risk count, moderate-risk count, and a prioritised high-priority patient table (patient, risk, score, status).
+
+P0
+
+DOC-2 | Patient list with search and filters (risk level, review status, date, name). | P0
+
+DOC-2
+
+Patient list with search and filters (risk level, review status, date, name).
+
+P0
+
+DOC-3 | High-risk queue sorted by urgency, then score, then waiting time. | P0
+
+DOC-3
+
+High-risk queue sorted by urgency, then score, then waiting time.
+
+P0
+
+DOC-4 | Patient details: profile, medical history, medications, risk factors, latest assessment, symptoms, vitals, AI explanation, AI recommendation. | P0
+
+DOC-4
+
+Patient details: profile, medical history, medications, risk factors, latest assessment, symptoms, vitals, AI explanation, AI recommendation.
+
+P0
+
+DOC-5 | Review actions: add clinical note, mark as reviewed, confirm or change triage status. Review states: PENDING, REVIEWED, ESCALATED, CLOSED. | P0
+
+DOC-5
+
+Review actions: add clinical note, mark as reviewed, confirm or change triage status. Review states: PENDING, REVIEWED, ESCALATED, CLOSED.
+
+P0
+
+DOC-6 | Clinician overrides are stored as a separate review record; the original AI output stays visible and unchanged. | P0
+
+DOC-6
+
+Clinician overrides are stored as a separate review record; the original AI output stays visible and unchanged.
+
+P0
+
+DOC-7 | Risk timeline and trends (risk score, BP, heart rate, weight, glucose where available). | P0
+
+DOC-7
+
+Risk timeline and trends (risk score, BP, heart rate, weight, glucose where available).
+
+P0
+
+DOC-8 | Access limited to assigned or otherwise authorised patients; unapproved workers see no patient data. | P0
+
+DOC-8
+
+Access limited to assigned or otherwise authorised patients; unapproved workers see no patient data.
+
+P0
+
+DOC-9 | Doctor profile page. | P1
+
+DOC-9
+
+Doctor profile page.
+
+P1
+
+6.10 Admin Features
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+ADM-1 | Dashboard: total users, patients, healthcare workers, pending approvals, total assessments, high-risk assessments; recent logins, assessments and account changes. | P0
+
+ADM-1
+
+Dashboard: total users, patients, healthcare workers, pending approvals, total assessments, high-risk assessments; recent logins, assessments and account changes.
+
+P0
+
+ADM-2 | User management: list, search, view, activate/deactivate accounts. | P0
+
+ADM-2
+
+User management: list, search, view, activate/deactivate accounts.
+
+P0
+
+ADM-3 | Healthcare-worker approval workflow with verification of professional ID. | P0
+
+ADM-3
+
+Healthcare-worker approval workflow with verification of professional ID.
+
+P0
+
+ADM-4 | Assessment monitoring (aggregate and read-only; no editing of historical predictions). | P1
+
+ADM-4
+
+Assessment monitoring (aggregate and read-only; no editing of historical predictions).
+
+P1
+
+ADM-5 | Audit log viewer with filters (user, action, entity, date). | P0
+
+ADM-5
+
+Audit log viewer with filters (user, action, entity, date).
+
+P0
+
+ADM-6 | System configuration (risk thresholds, notification rules) with change history; configuration changes apply to future assessments only. | P1
+
+ADM-6
+
+System configuration (risk thresholds, notification rules) with change history; configuration changes apply to future assessments only.
+
+P1
+
+ADM-7 | AI model information page: model type, version, training date, validation metrics, feature list. | P1
+
+ADM-7
+
+AI model information page: model type, version, training date, validation metrics, feature list.
+
+P1
+
+6.11 Timeline & Visualisation
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+VIS-1 | Risk timeline: date, level and score list plus a line chart of score over time with threshold bands. | P0
+
+VIS-1
+
+Risk timeline: date, level and score list plus a line chart of score over time with threshold bands.
+
+P0
+
+VIS-2 | Vital trends: BP (systolic/diastolic), heart rate, weight, glucose where available. | P0
+
+VIS-2
+
+Vital trends: BP (systolic/diastolic), heart rate, weight, glucose where available.
+
+P0
+
+VIS-3 | Charts are accessible: labelled axes, text alternatives, not colour-only. | P1
+
+VIS-3
+
+Charts are accessible: labelled axes, text alternatives, not colour-only.
+
+P1
+
+6.12 Notifications (In-App for MVP)
+
+Recipient | Trigger
+
+Recipient
+
+Trigger
+
+Healthcare worker | High-risk assessment generated; emergency sign detected; significant risk increase; assessment unreviewed beyond configured time; follow-up required
+
+Healthcare worker
+
+High-risk assessment generated; emergency sign detected; significant risk increase; assessment unreviewed beyond configured time; follow-up required
+
+Patient | Assessment completed; healthcare worker reviewed assessment; follow-up recommended
+
+Patient
+
+Assessment completed; healthcare worker reviewed assessment; follow-up recommended
+
+Notifications carry minimal information (e.g. "New high-risk assessment awaiting review") and link to the secured page; they never embed full clinical details.
+
+7. AI / ML Requirements
+
+7.1 Model
+
+Aspect | Requirement
+
+Aspect
+
+Requirement
+
+Candidate algorithms | Logistic Regression, Random Forest, XGBoost; choose the one with best interpretability / recall trade-off
+
+Candidate algorithms
+
+Logistic Regression, Random Forest, XGBoost; choose the one with best interpretability / recall trade-off
+
+Inputs | age, gender, BMI, symptoms (multi-hot), duration, vitals, medical history, medications, risk factors
+
+Inputs
+
+age, gender, BMI, symptoms (multi-hot), duration, vitals, medical history, medications, risk factors
+
+Outputs | risk_probability (calibrated), risk_score (0–100), risk_level
+
+Outputs
+
+risk_probability (calibrated), risk_score (0–100), risk_level
+
+Explainability | SHAP values (TreeExplainer or LinearExplainer); top-N contributions stored per assessment
+
+Explainability
+
+SHAP values (TreeExplainer or LinearExplainer); top-N contributions stored per assessment
+
+Artifact | Serialised model (models/risk_model.pkl) with version tag and feature schema
+
+Artifact
+
+Serialised model (models/risk_model.pkl) with version tag and feature schema
+
+Missing data | Defined imputation; missing critical vitals reduce confidence and are surfaced to the clinician
+
+Missing data
+
+Defined imputation; missing critical vitals reduce confidence and are surfaced to the clinician
+
+7.2 Training Data
+
+ImportantThe prototype must use synthetic data or properly licensed/de-identified public datasets, and this must be disclosed in the UI and documentation. Synthetic data demonstrates the pipeline but does not demonstrate clinical validity. Real deployment requires clinically validated data, bias analysis and regulatory review.
+
+Important
+
+The prototype must use synthetic data or properly licensed/de-identified public datasets, and this must be disclosed in the UI and documentation. Synthetic data demonstrates the pipeline but does not demonstrate clinical validity. Real deployment requires clinically validated data, bias analysis and regulatory review.
+
+7.3 Validation & Monitoring
+
+Report accuracy, recall/sensitivity for HIGH, precision, ROC-AUC and calibration on a held-out set; prioritise sensitivity for HIGH risk.
+
+Review fairness across age and gender subgroups.
+
+Risk-band thresholds are configuration, validated with clinical advisors, never presented as universal medical thresholds.
+
+Post-MVP: drift monitoring, periodic retraining, and a model registry.
+
+8. Emergency Safety Layer
+
+A deterministic rule engine runs before and alongside the ML model. An LLM or ML model alone must never determine emergency status.
+
+8.1 Illustrative Warning-Sign Rules (to be clinically reviewed)
+
+Rule category | Illustrative trigger
+
+Rule category
+
+Illustrative trigger
+
+Cardiac pattern | Chest pain/discomfort combined with sweating, breathlessness, or radiating pain
+
+Cardiac pattern
+
+Chest pain/discomfort combined with sweating, breathlessness, or radiating pain
+
+Neurological | Sudden weakness on one side, facial droop, speech difficulty, severe sudden headache, loss of consciousness
+
+Neurological
+
+Sudden weakness on one side, facial droop, speech difficulty, severe sudden headache, loss of consciousness
+
+Respiratory | Severe shortness of breath; SpO₂ below configured critical threshold
+
+Respiratory
+
+Severe shortness of breath; SpO₂ below configured critical threshold
+
+Vitals critical | Systolic BP, heart rate, temperature or glucose beyond configured critical limits
+
+Vitals critical
+
+Systolic BP, heart rate, temperature or glucose beyond configured critical limits
+
+Other | Heavy bleeding, seizure, suspected anaphylaxis, self-harm statements
+
+Other
+
+Heavy bleeding, seizure, suspected anaphylaxis, self-harm statements
+
+Rule hits force triage = Emergency/HIGH regardless of model score and display the emergency message immediately.
+
+Rule hits create a high-priority notification to healthcare workers and an audit log entry.
+
+All rules are versioned, unit-tested, and stored in configuration, not hard-coded into the UI.
+
+Self-harm indications trigger a supportive message pointing to local crisis/emergency resources and urgent clinician notification.
+
+9. Non-Functional Requirements
+
+9.1 Security
+
+ID | Requirement | Priority
+
+ID
+
+Requirement
+
+Priority
+
+SEC-1 | Authentication via managed provider (e.g. Supabase Auth); passwords hashed by provider; JWT/session tokens with expiry. | P0
+
+SEC-1
+
+Authentication via managed provider (e.g. Supabase Auth); passwords hashed by provider; JWT/session tokens with expiry.
+
+P0
+
+SEC-2 | Role-based access control enforced in API middleware and via PostgreSQL row-level security. | P0
+
+SEC-2
+
+Role-based access control enforced in API middleware and via PostgreSQL row-level security.
+
+P0
+
+SEC-3 | Patients access only their own records; workers only authorised patients; admins per configured permissions. | P0
+
+SEC-3
+
+Patients access only their own records; workers only authorised patients; admins per configured permissions.
+
+P0
+
+SEC-4 | HTTPS everywhere; secure, HttpOnly cookies where cookies are used. | P0
+
+SEC-4
+
+HTTPS everywhere; secure, HttpOnly cookies where cookies are used.
+
+P0
+
+SEC-5 | Server-side input validation and schema validation (Pydantic) on every endpoint; protection against injection and XSS. | P0
+
+SEC-5
+
+Server-side input validation and schema validation (Pydantic) on every endpoint; protection against injection and XSS.
+
+P0
+
+SEC-6 | No patient identifiers or health data in URLs, query strings or application logs (use opaque IDs). | P0
+
+SEC-6
+
+No patient identifiers or health data in URLs, query strings or application logs (use opaque IDs).
+
+P0
+
+SEC-7 | Audit log of key actions: login, logout, failed login, registration, approvals, assessment creation, record views by clinicians, review actions, account status changes, configuration changes. | P0
+
+SEC-7
+
+Audit log of key actions: login, logout, failed login, registration, approvals, assessment creation, record views by clinicians, review actions, account status changes, configuration changes.
+
+P0
+
+SEC-8 | Rate limiting on auth endpoints; account lockout/back-off on repeated failures. | P1
+
+SEC-8
+
+Rate limiting on auth endpoints; account lockout/back-off on repeated failures.
+
+P1
+
+SEC-9 | Encryption at rest for the database and backups; secrets in environment variables, never in source control. | P0
+
+SEC-9
+
+Encryption at rest for the database and backups; secrets in environment variables, never in source control.
+
+P0
+
+9.2 Privacy
+
+Explicit consent and a clear privacy notice before the first assessment; consent version and timestamp stored.
+
+Data minimisation: collect only fields needed for risk assessment.
+
+Ability to deactivate an account; data retention and deletion policy documented.
+
+Avoid sending unnecessary personal information to external AI services; strip identifiers if any external call is used.
+
+Prototype disclaimer: production deployment requires compliance with applicable healthcare and privacy regulations and institutional requirements (for example, India's DPDP Act and relevant health-data rules, HIPAA/GDPR where applicable), plus clinical safety assessment.
+
+9.3 Accessibility & UX Quality
+
+Target WCAG 2.1 AA contrast and keyboard navigation.
+
+Risk indicators use colour plus text labels and icons: LOW (green), MODERATE (amber), HIGH (red).
+
+Responsive layout; patient interface optimised for mobile.
+
+Plain-language wording suitable for non-clinical users.
+
+9.4 Performance, Reliability & Maintainability
+
+Inference plus explanation completes within seconds; dashboards load in under 3 seconds with demo data volumes.
+
+Graceful error states (LoadingState / ErrorMessage components); if the AI service fails, the assessment is saved and the patient is advised to contact a clinician rather than shown a guess.
+
+Automated unit tests for NLP, safety rules, validation and RBAC; API integration tests for core flows.
+
+Structured logging without PHI; database migrations under version control.
+
+10. System Architecture
+
+10.1 Components
+
+Layer | Technology | Responsibility
+
+Layer
+
+Technology
+
+Responsibility
+
+Frontend | Next.js (React), TypeScript, Tailwind, a charting library (e.g. Recharts) | Role-based UI, forms, dashboards, charts
+
+Frontend
+
+Next.js (React), TypeScript, Tailwind, a charting library (e.g. Recharts)
+
+Role-based UI, forms, dashboards, charts
+
+Backend API | Python FastAPI | Auth middleware, business logic, assessment orchestration, RBAC
+
+Backend API
+
+Python FastAPI
+
+Auth middleware, business logic, assessment orchestration, RBAC
+
+AI module | scikit-learn / XGBoost, SHAP, spaCy or rule-based NLP | NLP, preprocessing, risk model, explainability, recommendations
+
+AI module
+
+scikit-learn / XGBoost, SHAP, spaCy or rule-based NLP
+
+NLP, preprocessing, risk model, explainability, recommendations
+
+Database | PostgreSQL / Supabase with RLS | Persistent storage and row-level security
+
+Database
+
+PostgreSQL / Supabase with RLS
+
+Persistent storage and row-level security
+
+Auth | Supabase Auth or equivalent | Identity, password hashing, tokens
+
+Auth
+
+Supabase Auth or equivalent
+
+Identity, password hashing, tokens
+
+10.2 Frontend Structure
+
+Next.js app-router layout with route groups per role: /login, /register, /forgot-password, /patient/(dashboard, profile, assessment, assessment-result, history, risk-timeline, notifications), /doctor/(dashboard, patients, patient, assessments, high-risk, profile), /admin/(dashboard, users, healthcare-workers, assessments, audit-logs, settings). Shared components: Navbar, Sidebar, RiskBadge, RiskScore, VitalCard, PatientCard, AssessmentCard, RiskTimeline, ExplainabilityCard, RecommendationCard, LoadingState, ErrorMessage. Services: authService, patientService, assessmentService, aiService, notificationService. Route guards redirect users who lack the required role.
+
+10.3 Backend Structure
+
+FastAPI app with api/ (auth, patients, assessments, vitals, doctors, admin, ai, notifications), models/, schemas/, services/, ai/ (nlp, preprocessing, risk_model, explainability, recommendation), database/ (connection, migrations) and utils/ (security, validation, logging). The trained model is stored under models/risk_model.pkl.
+
+11. Data Model
+
+11.1 Entities
+
+Table | Purpose | Key fields
+
+Table
+
+Purpose
+
+Key fields
+
+users | Identity, role, status | id, email, phone, role (PATIENT / HEALTHCARE_WORKER / ADMIN), status, last_login
+
+users
+
+Identity, role, status
+
+id, email, phone, role (PATIENT / HEALTHCARE_WORKER / ADMIN), status, last_login
+
+patient_profiles | Patient demographics | user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency contact
+
+patient_profiles
+
+Patient demographics
+
+user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency contact
+
+healthcare_workers | Clinician identity and verification | user_id, professional_role, professional_id, hospital_name, department, verification_status
+
+healthcare_workers
+
+Clinician identity and verification
+
+user_id, professional_role, professional_id, hospital_name, department, verification_status
+
+medical_history | Conditions | patient_id, condition, status, diagnosed_date, notes
+
+medical_history
+
+Conditions
+
+patient_id, condition, status, diagnosed_date, notes
+
+medications | Current/past medications | patient_id, medication_name, dosage, frequency, start/end date
+
+medications
+
+Current/past medications
+
+patient_id, medication_name, dosage, frequency, start/end date
+
+risk_factors | Lifestyle and family risk | patient_id, factor_type, value, notes
+
+risk_factors
+
+Lifestyle and family risk
+
+patient_id, factor_type, value, notes
+
+patient_vitals | Vitals per assessment | patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate, spo2, temperature, respiratory_rate, blood_glucose, recorded_at
+
+patient_vitals
+
+Vitals per assessment
+
+patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate, spo2, temperature, respiratory_rate, blood_glucose, recorded_at
+
+assessments | Central table | patient_id, assigned_healthcare_worker_id, symptom_text, symptoms_json, duration, severity, history/risk-factor snapshots, risk_score, risk_level, triage_level, ai_status, recommendation, model_version
+
+assessments
+
+Central table
+
+patient_id, assigned_healthcare_worker_id, symptom_text, symptoms_json, duration, severity, history/risk-factor snapshots, risk_score, risk_level, triage_level, ai_status, recommendation, model_version
+
+ai_explanations | Per-feature explanation | assessment_id, feature, contribution, importance, explanation_text
+
+ai_explanations
+
+Per-feature explanation
+
+assessment_id, feature, contribution, importance, explanation_text
+
+healthcare_reviews | Clinician review | assessment_id, healthcare_worker_id, review_status (PENDING / REVIEWED / ESCALATED / CLOSED), clinical_notes, final_triage_status, reviewed_at
+
+healthcare_reviews
+
+Clinician review
+
+assessment_id, healthcare_worker_id, review_status (PENDING / REVIEWED / ESCALATED / CLOSED), clinical_notes, final_triage_status, reviewed_at
+
+notifications | In-app messages | user_id, title, message, type, is_read
+
+notifications
+
+In-app messages
+
+user_id, title, message, type, is_read
+
+audit_logs | Security trail | user_id, action, entity_type, entity_id, metadata, ip_address, created_at
+
+audit_logs
+
+Security trail
+
+user_id, action, entity_type, entity_id, metadata, ip_address, created_at
+
+11.2 Relationships
+
+users 1—1 patient_profiles or healthcare_workers (by role).
+
+patient_profiles 1—N medical_history, medications, risk_factors, assessments.
+
+assessments 1—N patient_vitals (typically 1), ai_explanations, healthcare_reviews.
+
+healthcare_workers 1—N healthcare_reviews.
+
+11.3 Data Integrity Rules
+
+Assessment AI fields (risk_score, risk_level, ai explanations, model_version) are write-once; no role can UPDATE them via the application.
+
+Clinician decisions live in healthcare_reviews; the effective triage shown is the latest review, with the AI value preserved.
+
+Soft-delete / deactivate instead of hard delete for clinically relevant records.
+
+Add a consent record (user_id, consent_version, accepted_at) to support the privacy requirement.
+
+12. API Specification (Summary)
+
+Area | Endpoints | Access
+
+Area
+
+Endpoints
+
+Access
+
+Auth | POST /api/auth/register · /login · /logout · /forgot-password · /reset-password; GET /api/auth/me | Public / authenticated
+
+Auth
+
+POST /api/auth/register · /login · /logout · /forgot-password · /reset-password; GET /api/auth/me
+
+Public / authenticated
+
+Patient | GET, PUT /api/patients/me; GET /api/patients/me/history; GET /api/patients/me/risk-timeline | Patient
+
+Patient
+
+GET, PUT /api/patients/me; GET /api/patients/me/history; GET /api/patients/me/risk-timeline
+
+Patient
+
+Assessment | POST /api/assessments; GET /api/assessments/{id}; GET /api/assessments/history | Patient (own); worker (authorised)
+
+Assessment
+
+POST /api/assessments; GET /api/assessments/{id}; GET /api/assessments/history
+
+Patient (own); worker (authorised)
+
+AI | POST /api/ai/analyze-symptoms; POST /api/ai/predict-risk; GET /api/ai/explanation/{assessment_id} | Internal / authorised
+
+AI
+
+POST /api/ai/analyze-symptoms; POST /api/ai/predict-risk; GET /api/ai/explanation/{assessment_id}
+
+Internal / authorised
+
+Healthcare worker | GET /api/doctor/dashboard · /patients · /patients/{id} · /high-risk; POST /api/doctor/reviews; PUT /api/doctor/reviews/{id} | Approved worker
+
+Healthcare worker
+
+GET /api/doctor/dashboard · /patients · /patients/{id} · /high-risk; POST /api/doctor/reviews; PUT /api/doctor/reviews/{id}
+
+Approved worker
+
+Admin | GET /api/admin/dashboard · /users · /healthcare-workers · /audit-logs; PUT /api/admin/users/{id}/status; PUT /api/admin/healthcare-workers/{id}/approve | Admin
+
+Admin
+
+GET /api/admin/dashboard · /users · /healthcare-workers · /audit-logs; PUT /api/admin/users/{id}/status; PUT /api/admin/healthcare-workers/{id}/approve
+
+Admin
+
+Notifications | GET /api/notifications; PUT /api/notifications/{id}/read (added) | Authenticated
+
+Notifications
+
+GET /api/notifications; PUT /api/notifications/{id}/read (added)
+
+Authenticated
+
+All endpoints validate input with schemas, enforce role checks, return consistent error formats, and write audit events for sensitive actions. The patient-side /api/ai/* endpoints should be reachable only through the assessment workflow so clients cannot submit arbitrary predictions.
+
+12.1 Sample Assessment Response
+
+{ "assessment_id": 101, "risk_score": 82, "risk_level": "HIGH", "triage_level": "IMMEDIATE", "safety_rule_triggered": true, "factors": [ {"feature":"chest_discomfort","contribution":0.24,"importance":"high"}, {"feature":"elevated_blood_pressure","contribution":0.21,"importance":"high"} ], "recommendation": "Immediate clinical assessment is recommended.", "model_version": "rf-0.1.0" }
+
+13. UI / UX Requirements
+
+13.1 Design Principles
+
+Professional healthcare dashboard: clean white/light interface, clear typography, card-based layout, tables and charts.
+
+Large, unmistakable risk indicators with text labels (LOW / MODERATE / HIGH).
+
+Mobile-first patient flows; information-dense, desktop-oriented clinician views.
+
+Always show disclaimers and the distinction between AI output and clinician review.
+
+13.2 Screen Inventory
+
+Group | Screens
+
+Group
+
+Screens
+
+Public | Landing page; Login; Patient registration; Healthcare worker login/registration; Forgot password
+
+Public
+
+Landing page; Login; Patient registration; Healthcare worker login/registration; Forgot password
+
+Patient | Dashboard; Health profile; New assessment; Assessment review; AI result; Assessment history; Risk timeline; Notifications; Settings
+
+Patient
+
+Dashboard; Health profile; New assessment; Assessment review; AI result; Assessment history; Risk timeline; Notifications; Settings
+
+Healthcare worker | Dashboard; Patient list; High-risk queue; Patient details; Assessment details; Risk timeline; Review assessment; Notifications; Profile
+
+Healthcare worker
+
+Dashboard; Patient list; High-risk queue; Patient details; Assessment details; Risk timeline; Review assessment; Notifications; Profile
+
+Admin | Dashboard; User management; Healthcare-worker approval; Assessment monitoring; Audit logs; System settings
+
+Admin
+
+Dashboard; User management; Healthcare-worker approval; Assessment monitoring; Audit logs; System settings
+
+13.3 Risk Indicator Specification
+
+Level | Colour | Text label | Icon
+
+Level
+
+Colour
+
+Text label
+
+Icon
+
+LOW | Green | LOW | Check-circle
+
+LOW
+
+Green
+
+LOW
+
+Check-circle
+
+MODERATE | Amber | MODERATE | Alert-triangle
+
+MODERATE
+
+Amber
+
+MODERATE
+
+Alert-triangle
+
+HIGH | Red | HIGH | Alert-octagon
+
+HIGH
+
+Red
+
+HIGH
+
+Alert-octagon
+
+14. Key User Flows
+
+14.1 Patient Assessment
+
+Patient logs in → dashboard → Start New Assessment → consent (first time).
+
+Completes Steps 1–6 with live validation → Step 7 review → Analyze My Risk.
+
+Backend runs validation, emergency check, NLP, model, SHAP, triage and recommendation, saves the assessment and creates notifications.
+
+Patient sees the result page; the assessment appears in history and the timeline.
+
+14.2 Clinician Review
+
+Worker receives a high-risk notification → opens high-risk queue → opens patient details.
+
+Reviews symptoms, vitals, AI explanation and trend → adds clinical note.
+
+Confirms or changes triage status → marks as reviewed or escalated → patient is notified.
+
+14.3 Healthcare Worker Onboarding
+
+Worker registers → status Pending (can log in but sees an "awaiting approval" page).
+
+Admin verifies professional ID → approves → status Approved/Active → full access; action audit-logged.
+
+15. Hackathon Demo Scenario
+
+Item | Value
+
+Item
+
+Value
+
+Patient | Age 58, hypertension history
+
+Patient
+
+Age 58, hypertension history
+
+Free-text symptoms | "I have chest discomfort and dizziness for 3 hours and I am sweating."
+
+Free-text symptoms
+
+"I have chest discomfort and dizziness for 3 hours and I am sweating."
+
+Extracted | chest discomfort, dizziness, sweating; duration 3 hours; severity unknown
+
+Extracted
+
+chest discomfort, dizziness, sweating; duration 3 hours; severity unknown
+
+Vitals | BP 165/100, heart rate 108, SpO₂ 96%
+
+Vitals
+
+BP 165/100, heart rate 108, SpO₂ 96%
+
+Expected outcome | HIGH risk (safety rule for cardiac pattern also triggered); explanation lists chest discomfort, elevated BP, increased heart rate, hypertension, dizziness
+
+Expected outcome
+
+HIGH risk (safety rule for cardiac pattern also triggered); explanation lists chest discomfort, elevated BP, increased heart rate, hypertension, dizziness
+
+Recommendation | Immediate clinical assessment
+
+Recommendation
+
+Immediate clinical assessment
+
+15.1 Demo Script
+
+Show patient login and dashboard with prior LOW/MODERATE history and timeline.
+
+Run the new assessment using the demo inputs; show NLP extraction confirmation.
+
+Show the HIGH result with explanation, disclaimer and emergency guidance.
+
+Switch to the doctor account: notification, high-risk queue, patient details, explanation, trend charts.
+
+Add a clinical note and mark reviewed; show the patient notification.
+
+Switch to admin: dashboard, healthcare-worker approval, audit log showing the trail.
+
+Demo accounts and data are synthetic and clearly labelled as such.
+
+16. Delivery Plan
+
+Milestone | Scope | Exit criteria
+
+Milestone
+
+Scope
+
+Exit criteria
+
+M1 – Foundations | Repo, DB schema, auth, RBAC, role routing | All three roles log in and reach correct dashboards
+
+M1 – Foundations
+
+Repo, DB schema, auth, RBAC, role routing
+
+All three roles log in and reach correct dashboards
+
+M2 – Patient data | Profile, history, meds, assessment wizard, validation | Assessment saved with snapshots
+
+M2 – Patient data
+
+Profile, history, meds, assessment wizard, validation
+
+Assessment saved with snapshots
+
+M3 – AI core | Safety rules, NLP, model, SHAP, triage, recommendations | Demo scenario yields HIGH with explanation
+
+M3 – AI core
+
+Safety rules, NLP, model, SHAP, triage, recommendations
+
+Demo scenario yields HIGH with explanation
+
+M4 – Clinician | Dashboard, queue, details, review workflow, notifications | Review loop closes back to patient
+
+M4 – Clinician
+
+Dashboard, queue, details, review workflow, notifications
+
+Review loop closes back to patient
+
+M5 – Insights | Risk timeline, vital trends, statistics | Charts render from stored data
+
+M5 – Insights
+
+Risk timeline, vital trends, statistics
+
+Charts render from stored data
+
+M6 – Hardening | RLS, audit logs, tests, privacy/consent, demo polish | RBAC tests pass; demo rehearsed
+
+M6 – Hardening
+
+RLS, audit logs, tests, privacy/consent, demo polish
+
+RBAC tests pass; demo rehearsed
+
+17. Risks & Mitigations
+
+Risk | Impact | Mitigation
+
+Risk
+
+Impact
+
+Mitigation
+
+Model trained on synthetic data is mistaken for clinically valid | High | Disclose clearly; label as prototype; require clinical validation before any real use
+
+Model trained on synthetic data is mistaken for clinically valid
+
+High
+
+Disclose clearly; label as prototype; require clinical validation before any real use
+
+False negative on a dangerous case | High | Deterministic safety rules; prioritise sensitivity; "when in doubt, escalate"; clinician review
+
+False negative on a dangerous case
+
+High
+
+Deterministic safety rules; prioritise sensitivity; "when in doubt, escalate"; clinician review
+
+Users treat output as diagnosis | High | Consistent wording, disclaimers, no disease names as conclusions
+
+Users treat output as diagnosis
+
+High
+
+Consistent wording, disclaimers, no disease names as conclusions
+
+Unauthorised data access | High | RBAC + RLS, audit logs, opaque IDs, tests
+
+Unauthorised data access
+
+High
+
+RBAC + RLS, audit logs, opaque IDs, tests
+
+Alert fatigue for clinicians | Medium | Tunable thresholds, queue sorting, grouped notifications
+
+Alert fatigue for clinicians
+
+Medium
+
+Tunable thresholds, queue sorting, grouped notifications
+
+Bias across demographics | Medium | Subgroup evaluation; document limitations
+
+Bias across demographics
+
+Medium
+
+Subgroup evaluation; document limitations
+
+NLP misses or mis-parses symptoms | Medium | Patient confirmation step; structured checklist alongside free text; keep raw text for clinician
+
+NLP misses or mis-parses symptoms
+
+Medium
+
+Patient confirmation step; structured checklist alongside free text; keep raw text for clinician
+
+Scope creep in hackathon | Medium | Strict phase gating; P0/P1/P2 priorities
+
+Scope creep in hackathon
+
+Medium
+
+Strict phase gating; P0/P1/P2 priorities
+
+Regulatory non-compliance on deployment | High (production) | State prototype status; compliance review before pilots
+
+Regulatory non-compliance on deployment
+
+High (production)
+
+State prototype status; compliance review before pilots
+
+18. Assumptions, Dependencies & Open Questions
+
+18.1 Assumptions
+
+Users have internet access and a modern browser; mobile web is sufficient (no native app).
+
+English is the initial language of the UI and NLP.
+
+Healthcare-worker assignment is manual or rule-based (e.g. by department) in the MVP.
+
+Patients can self-report vitals (e.g. from a home device); values are not device-verified.
+
+18.2 Open Questions
+
+Which clinical advisor will review safety rules, ranges and risk-band thresholds?
+
+Which target condition(s) does the model predict risk for (general deterioration vs. cardiovascular focus)? The demo suggests a cardiovascular emphasis.
+
+What dataset will be used for training, and under what licence?
+
+How are patients assigned to healthcare workers (by facility, department, round-robin)?
+
+What is the data-retention period and deletion process?
+
+Which jurisdictions and regulations apply for any pilot?
+
+19. Future Roadmap
+
+Horizon | Features
+
+Horizon
+
+Features
+
+Next | Email/SMS/push notifications; multilingual NLP; voice-based symptom input; appointment integration
+
+Next
+
+Email/SMS/push notifications; multilingual NLP; voice-based symptom input; appointment integration
+
+Later | WhatsApp/IVR access; wearable integration and continuous monitoring; teleconsultation
+
+Later
+
+WhatsApp/IVR access; wearable integration and continuous monitoring; teleconsultation
+
+Advanced | Population-level analytics; personalised risk trends; model monitoring and drift detection; EHR integration
+
+Advanced
+
+Population-level analytics; personalised risk trends; model monitoring and drift detection; EHR integration
+
+Appendix A – Proposed Vital Sign Validation Ranges
+
+Placeholder ranges for the prototype. They must be reviewed by a clinical advisor and stored as configuration. "Hard limit" rejects input as likely error; "warning" prompts the user to double-check.
+
+Vital | Hard limit (reject) | Warning range (unusual)
+
+Vital
+
+Hard limit (reject)
+
+Warning range (unusual)
+
+Systolic BP (mmHg) | < 50 or > 300 | < 90 or > 180
+
+Systolic BP (mmHg)
+
+< 50 or > 300
+
+< 90 or > 180
+
+Diastolic BP (mmHg) | < 30 or > 200 | < 60 or > 110
+
+Diastolic BP (mmHg)
+
+< 30 or > 200
+
+< 60 or > 110
+
+Heart rate (bpm) | < 20 or > 250 | < 50 or > 120
+
+Heart rate (bpm)
+
+< 20 or > 250
+
+< 50 or > 120
+
+SpO₂ (%) | < 50 or > 100 | < 94
+
+SpO₂ (%)
+
+< 50 or > 100
+
+< 94
+
+Temperature (°C) | < 30 or > 45 | < 35.5 or > 38.0
+
+Temperature (°C)
+
+< 30 or > 45
+
+< 35.5 or > 38.0
+
+Respiratory rate (/min) | < 4 or > 60 | < 10 or > 24
+
+Respiratory rate (/min)
+
+< 4 or > 60
+
+< 10 or > 24
+
+Blood glucose (mg/dL) | < 20 or > 800 | < 70 or > 250
+
+Blood glucose (mg/dL)
+
+< 20 or > 800
+
+< 70 or > 250
+
+Appendix B – Standard Wording
+
+Context | Approved wording
+
+Context
+
+Approved wording
+
+Result headline | AI identified an elevated risk pattern based on the information provided.
+
+Result headline
+
+AI identified an elevated risk pattern based on the information provided.
+
+Disclaimer | This AI assessment is not a diagnosis. A qualified healthcare professional should make the final decision.
+
+Disclaimer
+
+This AI assessment is not a diagnosis. A qualified healthcare professional should make the final decision.
+
+Emergency | If you have severe symptoms or feel your life is in danger, seek immediate medical attention or call your local emergency number. Do not rely on this application.
+
+Emergency
+
+If you have severe symptoms or feel your life is in danger, seek immediate medical attention or call your local emergency number. Do not rely on this application.
+
+Prohibited | "AI diagnosed your disease", "You have [condition]", "You are safe" / "No risk"
+
+Prohibited
+
+"AI diagnosed your disease", "You have [condition]", "You are safe" / "No risk"
+
+Appendix C – Glossary
+
+Term | Definition
+
+Term
+
+Definition
+
+Triage | Prioritising patients by urgency of need
+
+Triage
+
+Prioritising patients by urgency of need
+
+SHAP | SHapley Additive exPlanations, a method to attribute a prediction to input features
+
+SHAP
+
+SHapley Additive exPlanations, a method to attribute a prediction to input features
+
+RBAC | Role-based access control
+
+RBAC
+
+Role-based access control
+
+RLS | Row-level security in PostgreSQL
+
+RLS
+
+Row-level security in PostgreSQL
+
+NLP | Natural language processing
+
+NLP
+
+Natural language processing
+
+SpO₂ | Peripheral blood oxygen saturation
+
+SpO₂
+
+Peripheral blood oxygen saturation
+
+PHI | Protected health information
+
+PHI
+
+Protected health information
