@@ -75,7 +75,7 @@ def get_assessment_explanation(assessment_id: int, user: dict = Depends(get_curr
     cursor.execute("""
         SELECT feature, contribution, importance, explanation_text
         FROM ai_explanations
-        WHERE assessment_id = ?
+        WHERE assessment_id = %s
     """, (assessment_id,))
     rows = cursor.fetchall()
     conn.close()

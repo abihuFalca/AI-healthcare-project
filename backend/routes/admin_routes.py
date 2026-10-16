@@ -86,13 +86,13 @@ def get_users_list(
     """
     params = []
     if role:
-        sql += " AND u.role = ?"
+        sql += " AND u.role = %s"
         params.append(role.upper())
     if status:
-        sql += " AND u.status = ?"
+        sql += " AND u.status = %s"
         params.append(status.upper())
     if query:
-        sql += " AND (u.email LIKE ? OR p.full_name LIKE ? OR w.full_name LIKE ?)"
+        sql += " AND (u.email LIKE %s OR p.full_name LIKE %s OR w.full_name LIKE %s)"
         params.extend([f"%{query}%", f"%{query}%", f"%{query}%"])
 
     sql += " ORDER BY u.created_at DESC"
@@ -108,7 +108,7 @@ def update_user_status(id: int, req: UserStatusUpdateRequest, user: dict = Depen
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET status = ? WHERE id = ?", (req.status, id))
+    cursor.execute("UPDATE users SET status = %s WHERE id = %s", (req.status, id))
     conn.commit()
 
     log_audit_event(user["id"], "USER_STATUS_CHANGE", "USER", str(id), f"Changed status to {req.status}")
@@ -142,7 +142,7 @@ def approve_healthcare_worker(id: int, req: DoctorApprovalRequest, user: dict = 
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, full_name, professional_id FROM healthcare_workers WHERE id = ?", (id,))
+    cursor.execute("SELECT user_id, full_name, professional_id FROM healthcare_workers WHERE id = %s", (id,))
     worker = cursor.fetchone()
     if not worker:
         conn.close()
@@ -154,18 +154,18 @@ def approve_healthcare_worker(id: int, req: DoctorApprovalRequest, user: dict = 
     # Update verification status
     cursor.execute("""
         UPDATE healthcare_workers
-        SET verification_status = ?, verified_at = ?, verified_by_user_id = ?
-        WHERE id = ?
+        SET verification_status = %s, verified_at = %s, verified_by_user_id = %s
+        WHERE id = %s
     """, (req.verification_status, now_iso, user["id"], id))
 
     # If approved, activate user account
     account_status = "ACTIVE" if req.verification_status == "APPROVED" else "DEACTIVATED"
-    cursor.execute("UPDATE users SET status = ? WHERE id = ?", (account_status, user_id))
+    cursor.execute("UPDATE users SET status = %s WHERE id = %s", (account_status, user_id))
 
     # Send Notification to Doctor
     cursor.execute("""
         INSERT INTO notifications (user_id, title, message, type, is_read, link_url, created_at)
-        VALUES (?, 'Account Verification Status', ?, 'ACCOUNT_STATUS', 0, '/doctor/dashboard', ?)
+        VALUES (%s, 'Account Verification Status', %s, 'ACCOUNT_STATUS', FALSE, '/doctor/dashboard', %s)
     """, (user_id, f"Your clinician account has been {req.verification_status.lower()} by the administrator.", now_iso))
 
     conn.commit()
@@ -195,10 +195,10 @@ def get_audit_logs(
     """
     params = []
     if action:
-        sql += " AND a.action = ?"
+        sql += " AND a.action = %s"
         params.append(action)
     if entity_type:
-        sql += " AND a.entity_type = ?"
+        sql += " AND a.entity_type = %s"
         params.append(entity_type)
 
     sql += " ORDER BY a.created_at DESC LIMIT 100"
@@ -222,8 +222,8 @@ def update_setting(req: SettingUpdateRequest, user: dict = Depends(require_role(
     cursor = conn.cursor()
     now_iso = datetime.now().isoformat()
     cursor.execute("""
-        UPDATE system_settings SET setting_value = ?, updated_at = ?
-        WHERE setting_key = ?
+        UPDATE system_settings SET setting_value = %s, updated_at = %s
+        WHERE setting_key = %s
     """, (req.setting_value, now_iso, req.setting_key))
     conn.commit()
 

@@ -47,7 +47,7 @@ def get_doctor_dashboard(user: dict = Depends(require_role(["HEALTHCARE_WORKER",
         JOIN patient_profiles p ON a.patient_id = p.id
         LEFT JOIN healthcare_reviews r ON a.id = r.assessment_id
         LEFT JOIN patient_vitals v ON a.id = v.assessment_id
-        WHERE a.risk_level IN ('HIGH', 'MODERATE') OR a.safety_rule_triggered = 1
+        WHERE a.risk_level IN ('HIGH', 'MODERATE') OR a.safety_rule_triggered = TRUE
         ORDER BY
             CASE WHEN a.triage_level = 'EMERGENCY' THEN 1
                  WHEN a.triage_level = 'IMMEDIATE' THEN 2
@@ -103,15 +103,15 @@ def get_patient_list(
     params = []
 
     if query:
-        sql += " AND (p.full_name LIKE ? OR p.emergency_contact LIKE ?)"
+        sql += " AND (p.full_name LIKE %s OR p.emergency_contact LIKE %s)"
         params.extend([f"%{query}%", f"%{query}%"])
 
     if risk_level:
-        sql += " AND latest.risk_level = ?"
+        sql += " AND latest.risk_level = %s"
         params.append(risk_level.upper())
 
     if review_status:
-        sql += " AND r.review_status = ?"
+        sql += " AND r.review_status = %s"
         params.append(review_status.upper())
 
     sql += " ORDER BY latest.risk_score DESC NULLS LAST"
@@ -137,7 +137,7 @@ def get_high_risk_queue(user: dict = Depends(require_role(["HEALTHCARE_WORKER", 
         JOIN patient_profiles p ON a.patient_id = p.id
         LEFT JOIN healthcare_reviews r ON a.id = r.assessment_id
         LEFT JOIN patient_vitals v ON a.id = v.assessment_id
-        WHERE a.risk_level = 'HIGH' OR a.safety_rule_triggered = 1
+        WHERE a.risk_level = 'HIGH' OR a.safety_rule_triggered = TRUE
         ORDER BY
             CASE WHEN a.triage_level = 'EMERGENCY' THEN 1
                  WHEN a.triage_level = 'IMMEDIATE' THEN 2
@@ -155,7 +155,7 @@ def get_patient_detail(id: int, user: dict = Depends(require_role(["HEALTHCARE_W
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM patient_profiles WHERE id = ?", (id,))
+    cursor.execute("SELECT * FROM patient_profiles WHERE id = %s", (id,))
     p_row = cursor.fetchone()
     if not p_row:
         conn.close()
@@ -165,15 +165,15 @@ def get_patient_detail(id: int, user: dict = Depends(require_role(["HEALTHCARE_W
     profile["bmi"] = calculate_bmi(profile.get("height"), profile.get("weight"))
 
     # Conditions
-    cursor.execute("SELECT * FROM medical_history WHERE patient_id = ?", (id,))
+    cursor.execute("SELECT * FROM medical_history WHERE patient_id = %s", (id,))
     history = [dict(r) for r in cursor.fetchall()]
 
     # Medications
-    cursor.execute("SELECT * FROM medications WHERE patient_id = ?", (id,))
+    cursor.execute("SELECT * FROM medications WHERE patient_id = %s", (id,))
     medications = [dict(r) for r in cursor.fetchall()]
 
     # Risk factors
-    cursor.execute("SELECT * FROM risk_factors WHERE patient_id = ?", (id,))
+    cursor.execute("SELECT * FROM risk_factors WHERE patient_id = %s", (id,))
     risk_factors = [dict(r) for r in cursor.fetchall()]
 
     # Assessments history
@@ -183,7 +183,7 @@ def get_patient_detail(id: int, user: dict = Depends(require_role(["HEALTHCARE_W
         FROM assessments a
         LEFT JOIN healthcare_reviews r ON a.id = r.assessment_id
         LEFT JOIN patient_vitals v ON a.id = v.assessment_id
-        WHERE a.patient_id = ?
+        WHERE a.patient_id = %s
         ORDER BY a.created_at DESC
     """, (id,))
     assessments = [dict(r) for r in cursor.fetchall()]
@@ -192,7 +192,7 @@ def get_patient_detail(id: int, user: dict = Depends(require_role(["HEALTHCARE_W
     latest_factors = []
     if assessments:
         latest_asm_id = assessments[0]["id"]
-        cursor.execute("SELECT * FROM ai_explanations WHERE assessment_id = ?", (latest_asm_id,))
+        cursor.execute("SELECT * FROM ai_explanations WHERE assessment_id = %s", (latest_asm_id,))
         latest_factors = [dict(r) for r in cursor.fetchall()]
 
     conn.close()
@@ -216,7 +216,7 @@ def submit_review(req: ReviewSubmissionRequest, user: dict = Depends(require_rol
 
     # Determine doctor ID
     doctor_id = 1
-    cursor.execute("SELECT id FROM healthcare_workers WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM healthcare_workers WHERE user_id = %s", (user["id"],))
     d_row = cursor.fetchone()
     if d_row:
         doctor_id = d_row["id"]
@@ -224,7 +224,7 @@ def submit_review(req: ReviewSubmissionRequest, user: dict = Depends(require_rol
     now_iso = datetime.now().isoformat()
 
     # Verify assessment exists
-    cursor.execute("SELECT patient_id, risk_score, risk_level, triage_level FROM assessments WHERE id = ?", (req.assessment_id,))
+    cursor.execute("SELECT patient_id, risk_score, risk_level, triage_level FROM assessments WHERE id = %s", (req.assessment_id,))
     asm_row = cursor.fetchone()
     if not asm_row:
         conn.close()
@@ -233,30 +233,30 @@ def submit_review(req: ReviewSubmissionRequest, user: dict = Depends(require_rol
     patient_id = asm_row["patient_id"]
 
     # Check if review record exists
-    cursor.execute("SELECT id FROM healthcare_reviews WHERE assessment_id = ?", (req.assessment_id,))
+    cursor.execute("SELECT id FROM healthcare_reviews WHERE assessment_id = %s", (req.assessment_id,))
     existing_rev = cursor.fetchone()
 
     if existing_rev:
         cursor.execute("""
             UPDATE healthcare_reviews
-            SET healthcare_worker_id = ?, review_status = ?, clinical_notes = ?,
-                final_triage_status = ?, reviewed_at = ?
-            WHERE assessment_id = ?
+            SET healthcare_worker_id = %s, review_status = %s, clinical_notes = %s,
+                final_triage_status = %s, reviewed_at = %s
+            WHERE assessment_id = %s
         """, (doctor_id, req.review_status, req.clinical_notes, req.final_triage_status, now_iso, req.assessment_id))
     else:
         cursor.execute("""
             INSERT INTO healthcare_reviews (assessment_id, healthcare_worker_id, review_status, clinical_notes, final_triage_status, reviewed_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (req.assessment_id, doctor_id, req.review_status, req.clinical_notes, req.final_triage_status, now_iso))
 
     # Send Notification to Patient (PRD 6.12)
-    cursor.execute("SELECT user_id FROM patient_profiles WHERE id = ?", (patient_id,))
+    cursor.execute("SELECT user_id FROM patient_profiles WHERE id = %s", (patient_id,))
     pat_user = cursor.fetchone()
     if pat_user:
         notif_msg = f"A healthcare clinician has reviewed your assessment. Triage status: {req.final_triage_status}."
         cursor.execute("""
             INSERT INTO notifications (user_id, title, message, type, is_read, link_url, created_at)
-            VALUES (?, 'Clinician Review Completed', ?, 'REVIEW_COMPLETED', 0, ?, ?)
+            VALUES (%s, 'Clinician Review Completed', %s, 'REVIEW_COMPLETED', FALSE, %s, %s)
         """, (pat_user["user_id"], notif_msg, f"/patient/assessment-result/{req.assessment_id}", now_iso))
 
     conn.commit()

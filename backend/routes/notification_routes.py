@@ -11,7 +11,7 @@ def get_user_notifications(user: dict = Depends(get_current_user)):
     cursor.execute("""
         SELECT id, title, message, type, is_read, link_url, created_at
         FROM notifications
-        WHERE user_id = ?
+        WHERE user_id = %s
         ORDER BY created_at DESC LIMIT 30
     """, (user["id"],))
     notifs = [dict(r) for r in cursor.fetchall()]
@@ -22,7 +22,7 @@ def get_user_notifications(user: dict = Depends(get_current_user)):
 def mark_notification_read(id: int, user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?", (id, user["id"]))
+    cursor.execute("UPDATE notifications SET is_read = TRUE WHERE id = %s AND user_id = %s", (id, user["id"]))
     conn.commit()
     conn.close()
     return {"message": "Notification marked as read"}
@@ -31,7 +31,7 @@ def mark_notification_read(id: int, user: dict = Depends(get_current_user)):
 def mark_all_notifications_read(user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE notifications SET is_read = 1 WHERE user_id = ?", (user["id"],))
+    cursor.execute("UPDATE notifications SET is_read = TRUE WHERE user_id = %s", (user["id"],))
     conn.commit()
     conn.close()
     return {"message": "All notifications marked as read"}

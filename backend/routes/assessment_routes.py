@@ -133,11 +133,11 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
     rec_info = get_recommendation(triage_level, safety_triggered=is_emergency, safety_rules=triggered_rules)
     final_recommendation = emergency_recommendation if is_emergency else rec_info["recommendation_text"]
 
-    # 7. Persistence in SQLite DB
+    # 7. Persistence in PostgreSQL DB
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, full_name FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id, full_name FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pat_profile = cursor.fetchone()
     patient_id = pat_profile["id"]
     patient_name = pat_profile["full_name"]
@@ -158,22 +158,22 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
             duration, severity, history_snapshot, risk_factors_snapshot, medications_snapshot,
             vitals_snapshot, risk_score, risk_level, triage_level, safety_rule_triggered,
             safety_rule_details, ai_status, recommendation, model_version, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'COMPLETED', %s, %s, %s) RETURNING id
     """, (
         patient_id, assigned_doc_id, req.symptom_text, json.dumps(combined_symptoms),
         duration, severity, json.dumps(req.medical_history), json.dumps(req.risk_factors),
         json.dumps(req.medications), json.dumps(vitals_dict), score, risk_level,
-        triage_level, 1 if is_emergency else 0,
+        triage_level, is_emergency,
         json.dumps(triggered_rules), final_recommendation, MODEL_VERSION, now_iso
     ))
-    assessment_id = cursor.lastrowid
+    assessment_id = cursor.fetchone()["id"]
 
     # Insert vitals record
     cursor.execute("""
         INSERT INTO patient_vitals (
             patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate,
             spo2, temperature, respiratory_rate, blood_glucose, recorded_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         patient_id, assessment_id, vitals_dict.get("systolic_bp"), vitals_dict.get("diastolic_bp"),
         vitals_dict.get("heart_rate"), vitals_dict.get("spo2"), vitals_dict.get("temperature"),
@@ -184,31 +184,31 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
     for f in factors:
         cursor.execute("""
             INSERT INTO ai_explanations (assessment_id, feature, contribution, importance, explanation_text)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (assessment_id, f["feature"], f["contribution"], f["importance"], f["explanation_text"]))
 
     # Insert pending healthcare review record
     if assigned_doc_id:
         cursor.execute("""
             INSERT INTO healthcare_reviews (assessment_id, healthcare_worker_id, review_status, clinical_notes, final_triage_status)
-            VALUES (?, ?, 'PENDING', NULL, NULL)
+            VALUES (%s, %s, 'PENDING', NULL, NULL)
         """, (assessment_id, assigned_doc_id))
 
         # Doctor Notification if HIGH / EMERGENCY (PRD 6.12)
         if risk_level == "HIGH" or is_emergency:
-            cursor.execute("SELECT user_id FROM healthcare_workers WHERE id = ?", (assigned_doc_id,))
+            cursor.execute("SELECT user_id FROM healthcare_workers WHERE id = %s", (assigned_doc_id,))
             doc_user = cursor.fetchone()
             if doc_user:
                 notif_msg = f"Patient {patient_name} submitted a HIGH risk assessment (Score: {score}/100, Triage: {triage_level}). Immediate review requested."
                 cursor.execute("""
                     INSERT INTO notifications (user_id, title, message, type, is_read, link_url, created_at)
-                    VALUES (?, 'High-Risk Patient Assessment Alert', ?, 'HIGH_RISK_ALERT', 0, ?, ?)
+                    VALUES (%s, 'High-Risk Patient Assessment Alert', %s, 'HIGH_RISK_ALERT', FALSE, %s, %s)
                 """, (doc_user["user_id"], notif_msg, f"/doctor/patient/{patient_id}", now_iso))
 
     # Patient confirmation notification
     cursor.execute("""
         INSERT INTO notifications (user_id, title, message, type, is_read, link_url, created_at)
-        VALUES (?, 'Assessment Analyzed', ?, 'ASSESSMENT_COMPLETED', 0, ?, ?)
+        VALUES (%s, 'Assessment Analyzed', %s, 'ASSESSMENT_COMPLETED', FALSE, %s, %s)
     """, (user["id"], f"Your health assessment has been analyzed (Estimated Risk Level: {risk_level}).", f"/patient/assessment-result/{assessment_id}", now_iso))
 
     conn.commit()
@@ -250,7 +250,7 @@ def get_assessment(id: int, user: dict = Depends(get_current_user)):
         SELECT a.*, p.full_name as patient_name, p.date_of_birth, p.gender, p.user_id as patient_user_id
         FROM assessments a
         JOIN patient_profiles p ON a.patient_id = p.id
-        WHERE a.id = ?
+        WHERE a.id = %s
     """, (id,))
     row = cursor.fetchone()
     if not row:
@@ -265,12 +265,12 @@ def get_assessment(id: int, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Unauthorized access to patient record")
 
     # Vitals
-    cursor.execute("SELECT * FROM patient_vitals WHERE assessment_id = ?", (id,))
+    cursor.execute("SELECT * FROM patient_vitals WHERE assessment_id = %s", (id,))
     v_row = cursor.fetchone()
     asm["vitals"] = dict(v_row) if v_row else None
 
     # Factors
-    cursor.execute("SELECT feature, contribution, importance, explanation_text FROM ai_explanations WHERE assessment_id = ?", (id,))
+    cursor.execute("SELECT feature, contribution, importance, explanation_text FROM ai_explanations WHERE assessment_id = %s", (id,))
     asm["factors"] = [dict(r) for r in cursor.fetchall()]
 
     # Review
@@ -278,7 +278,7 @@ def get_assessment(id: int, user: dict = Depends(get_current_user)):
         SELECT r.*, w.full_name as doctor_name, w.professional_role, w.hospital_name
         FROM healthcare_reviews r
         JOIN healthcare_workers w ON r.healthcare_worker_id = w.id
-        WHERE r.assessment_id = ?
+        WHERE r.assessment_id = %s
     """, (id,))
     r_row = cursor.fetchone()
     asm["review"] = dict(r_row) if r_row else None
@@ -291,7 +291,7 @@ def get_assessment_history(user: dict = Depends(require_role(["PATIENT"]))):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pid = cursor.fetchone()["id"]
 
     cursor.execute("""
@@ -300,7 +300,7 @@ def get_assessment_history(user: dict = Depends(require_role(["PATIENT"]))):
                r.review_status, r.final_triage_status, r.clinical_notes, r.reviewed_at
         FROM assessments a
         LEFT JOIN healthcare_reviews r ON a.id = r.assessment_id
-        WHERE a.patient_id = ?
+        WHERE a.patient_id = %s
         ORDER BY a.created_at DESC
     """, (pid,))
     rows = cursor.fetchall()

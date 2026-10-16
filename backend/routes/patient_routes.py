@@ -37,7 +37,7 @@ def get_my_patient_profile(user: dict = Depends(require_role(["PATIENT"]))):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT * FROM patient_profiles WHERE user_id = %s", (user["id"],))
     p_row = cursor.fetchone()
     if not p_row:
         conn.close()
@@ -48,15 +48,15 @@ def get_my_patient_profile(user: dict = Depends(require_role(["PATIENT"]))):
     profile["bmi"] = calculate_bmi(profile.get("height"), profile.get("weight"))
 
     # Medical history
-    cursor.execute("SELECT id, condition, status, diagnosed_date, notes FROM medical_history WHERE patient_id = ?", (patient_id,))
+    cursor.execute("SELECT id, condition, status, diagnosed_date, notes FROM medical_history WHERE patient_id = %s", (patient_id,))
     history = [dict(r) for r in cursor.fetchall()]
 
     # Medications
-    cursor.execute("SELECT id, medication_name, dosage, frequency FROM medications WHERE patient_id = ?", (patient_id,))
+    cursor.execute("SELECT id, medication_name, dosage, frequency FROM medications WHERE patient_id = %s", (patient_id,))
     medications = [dict(r) for r in cursor.fetchall()]
 
     # Risk factors
-    cursor.execute("SELECT id, factor_type, value, notes FROM risk_factors WHERE patient_id = ?", (patient_id,))
+    cursor.execute("SELECT id, factor_type, value, notes FROM risk_factors WHERE patient_id = %s", (patient_id,))
     risk_factors = [dict(r) for r in cursor.fetchall()]
 
     # Latest assessment & vitals summary
@@ -66,7 +66,7 @@ def get_my_patient_profile(user: dict = Depends(require_role(["PATIENT"]))):
                v.systolic_bp, v.diastolic_bp, v.heart_rate, v.spo2, v.temperature, v.blood_glucose
         FROM assessments a
         LEFT JOIN patient_vitals v ON a.id = v.assessment_id
-        WHERE a.patient_id = ?
+        WHERE a.patient_id = %s
         ORDER BY a.created_at DESC LIMIT 1
     """, (patient_id,))
     latest_row = cursor.fetchone()
@@ -86,7 +86,7 @@ def update_patient_profile(req: ProfileUpdateRequest, user: dict = Depends(requi
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -95,12 +95,12 @@ def update_patient_profile(req: ProfileUpdateRequest, user: dict = Depends(requi
     fields = []
     values = []
     for k, v in req.dict(exclude_unset=True).items():
-        fields.append(f"{k} = ?")
+        fields.append(f"{k} = %s")
         values.append(v)
 
     if fields:
         values.append(user["id"])
-        query = f"UPDATE patient_profiles SET {', '.join(fields)} WHERE user_id = ?"
+        query = f"UPDATE patient_profiles SET {', '.join(fields)} WHERE user_id = %s"
         cursor.execute(query, values)
         conn.commit()
 
@@ -113,8 +113,8 @@ def accept_consent(user: dict = Depends(require_role(["PATIENT"]))):
     cursor = conn.cursor()
     now_iso = datetime.now().isoformat()
     cursor.execute("""
-        UPDATE patient_profiles SET consent_accepted = 1, consent_accepted_at = ?
-        WHERE user_id = ?
+        UPDATE patient_profiles SET consent_accepted = TRUE, consent_accepted_at = %s
+        WHERE user_id = %s
     """, (now_iso, user["id"]))
     conn.commit()
     conn.close()
@@ -128,7 +128,7 @@ def get_risk_timeline(user: dict = Depends(require_role(["PATIENT", "HEALTHCARE_
 
     patient_id = None
     if user["role"] == "PATIENT":
-        cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+        cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
         p_row = cursor.fetchone()
         if p_row:
             patient_id = p_row["id"]
@@ -142,7 +142,7 @@ def get_risk_timeline(user: dict = Depends(require_role(["PATIENT", "HEALTHCARE_
                v.systolic_bp, v.diastolic_bp, v.heart_rate, v.spo2, v.temperature, v.blood_glucose
         FROM assessments a
         LEFT JOIN patient_vitals v ON a.id = v.assessment_id
-        WHERE a.patient_id = ?
+        WHERE a.patient_id = %s
         ORDER BY a.created_at ASC
     """, (patient_id,))
     
@@ -159,11 +159,11 @@ def get_risk_timeline(user: dict = Depends(require_role(["PATIENT", "HEALTHCARE_
 def add_medical_history(req: HistoryItemRequest, user: dict = Depends(require_role(["PATIENT"]))):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pid = cursor.fetchone()["id"]
     cursor.execute("""
         INSERT INTO medical_history (patient_id, condition, status, diagnosed_date, notes)
-        VALUES (?, ?, 'ACTIVE', ?, ?)
+        VALUES (%s, %s, 'ACTIVE', %s, %s)
     """, (pid, req.condition, req.diagnosed_date, req.notes))
     conn.commit()
     conn.close()
@@ -173,11 +173,11 @@ def add_medical_history(req: HistoryItemRequest, user: dict = Depends(require_ro
 def add_medication(req: MedicationItemRequest, user: dict = Depends(require_role(["PATIENT"]))):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pid = cursor.fetchone()["id"]
     cursor.execute("""
         INSERT INTO medications (patient_id, medication_name, dosage, frequency)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """, (pid, req.medication_name, req.dosage, req.frequency))
     conn.commit()
     conn.close()
@@ -187,11 +187,11 @@ def add_medication(req: MedicationItemRequest, user: dict = Depends(require_role
 def add_risk_factor(req: RiskFactorItemRequest, user: dict = Depends(require_role(["PATIENT"]))):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = ?", (user["id"],))
+    cursor.execute("SELECT id FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pid = cursor.fetchone()["id"]
     cursor.execute("""
         INSERT INTO risk_factors (patient_id, factor_type, value, notes)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     """, (pid, req.factor_type, req.value, req.notes))
     conn.commit()
     conn.close()

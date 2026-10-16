@@ -5,13 +5,16 @@ PRD Section 6.1 & 9.1
 
 import jwt
 import hashlib
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
 from database import get_db
 
-SECRET_KEY = "med_triage_super_secure_clinical_jwt_secret_key_2026"
+load_dotenv()
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "med_triage_super_secure_clinical_jwt_secret_key_2026")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
@@ -47,7 +50,7 @@ def log_audit_event(
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata, ip_address, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (user_id, action, entity_type, str(entity_id or ""), metadata, ip_address, datetime.now().isoformat()))
         conn.commit()
         conn.close()
@@ -67,7 +70,7 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, email, phone, role, status FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT id, email, phone, role, status FROM users WHERE id = %s", (user_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -82,11 +85,11 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
 
     # Attach profile or clinician record
     if user["role"] == "PATIENT":
-        cursor.execute("SELECT id, full_name, date_of_birth, gender, height, weight, preferred_language, consent_accepted FROM patient_profiles WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT id, full_name, date_of_birth, gender, height, weight, preferred_language, consent_accepted FROM patient_profiles WHERE user_id = %s", (user_id,))
         p_row = cursor.fetchone()
         user["profile"] = dict(p_row) if p_row else None
     elif user["role"] == "HEALTHCARE_WORKER":
-        cursor.execute("SELECT id, full_name, professional_role, professional_id, hospital_name, department, verification_status FROM healthcare_workers WHERE user_id = ?", (user_id,))
+        cursor.execute("SELECT id, full_name, professional_role, professional_id, hospital_name, department, verification_status FROM healthcare_workers WHERE user_id = %s", (user_id,))
         w_row = cursor.fetchone()
         user["doctor_profile"] = dict(w_row) if w_row else None
 

@@ -41,7 +41,7 @@ def login(req: LoginRequest):
     
     cursor.execute("""
         SELECT id, email, phone, role, status FROM users
-        WHERE (email = ? OR phone = ?) AND password_hash = ?
+        WHERE (email = %s OR phone = %s) AND password_hash = %s
     """, (req.login.lower().strip(), req.login.strip(), pwd_hash))
     user_row = cursor.fetchone()
 
@@ -57,7 +57,7 @@ def login(req: LoginRequest):
 
     # Update last login
     now_iso = datetime.now().isoformat()
-    cursor.execute("UPDATE users SET last_login = ? WHERE id = ?", (now_iso, user["id"]))
+    cursor.execute("UPDATE users SET last_login = %s WHERE id = %s", (now_iso, user["id"]))
     conn.commit()
 
     token = create_access_token(user["id"], user["email"], user["role"])
@@ -66,11 +66,11 @@ def login(req: LoginRequest):
     # Get associated details
     profile_data = None
     if user["role"] == "PATIENT":
-        cursor.execute("SELECT * FROM patient_profiles WHERE user_id = ?", (user["id"],))
+        cursor.execute("SELECT * FROM patient_profiles WHERE user_id = %s", (user["id"],))
         p = cursor.fetchone()
         profile_data = dict(p) if p else None
     elif user["role"] == "HEALTHCARE_WORKER":
-        cursor.execute("SELECT * FROM healthcare_workers WHERE user_id = ?", (user["id"],))
+        cursor.execute("SELECT * FROM healthcare_workers WHERE user_id = %s", (user["id"],))
         d = cursor.fetchone()
         profile_data = dict(d) if d else None
 
@@ -93,7 +93,7 @@ def register_patient(req: PatientRegisterRequest):
     cursor = conn.cursor()
 
     # Check existing
-    cursor.execute("SELECT id FROM users WHERE email = ?", (req.email.lower(),))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (req.email.lower(),))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -103,13 +103,13 @@ def register_patient(req: PatientRegisterRequest):
 
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, created_at)
-        VALUES (?, ?, ?, 'PATIENT', 'ACTIVE', ?)
+        VALUES (%s, %s, %s, 'PATIENT', 'ACTIVE', %s) RETURNING id
     """, (req.email.lower(), req.phone, pwd_hash, now_iso))
-    user_id = cursor.lastrowid
+    user_id = cursor.fetchone()[0]
 
     cursor.execute("""
         INSERT INTO patient_profiles (user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency_contact, consent_accepted, consent_accepted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)
     """, (user_id, req.full_name, req.date_of_birth, req.gender, req.height, req.weight, req.preferred_language, req.emergency_contact, now_iso))
 
     conn.commit()
@@ -135,7 +135,7 @@ def register_doctor(req: DoctorRegisterRequest):
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email = ?", (req.email.lower(),))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (req.email.lower(),))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -146,13 +146,13 @@ def register_doctor(req: DoctorRegisterRequest):
     # Healthcare-worker status starts as PENDING until Admin approval (PRD AUTH-4, Section 4.1)
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, created_at)
-        VALUES (?, ?, ?, 'HEALTHCARE_WORKER', 'PENDING', ?)
+        VALUES (%s, %s, %s, 'HEALTHCARE_WORKER', 'PENDING', %s) RETURNING id
     """, (req.email.lower(), req.phone, pwd_hash, now_iso))
-    user_id = cursor.lastrowid
+    user_id = cursor.fetchone()[0]
 
     cursor.execute("""
         INSERT INTO healthcare_workers (user_id, full_name, professional_role, professional_id, hospital_name, department, verification_status)
-        VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+        VALUES (%s, %s, %s, %s, %s, %s, 'PENDING')
     """, (user_id, req.full_name, req.professional_role, req.professional_id, req.hospital_name, req.department))
 
     conn.commit()
