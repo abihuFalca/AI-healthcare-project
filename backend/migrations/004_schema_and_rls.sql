@@ -4,6 +4,8 @@
 -- PURPOSE: Create the complete production-ready PostgreSQL schema in Supabase,
 --          including Row Level Security (RLS) policies for all 14 tables.
 --
+-- DATABASE: Supabase PostgreSQL 17.6
+-- PROJECT:  volaahbzuugmuefpjzhu  (Ai-patient-triage)
 --
 -- PRE-CONDITIONS (verify before running):
 --   1. The Supabase public schema must be EMPTY (no application tables).
@@ -15,6 +17,7 @@
 --      this file completes without errors.
 --
 -- HOW TO RUN (you must do this — Kiro cannot execute write SQL via MCP):
+--   1. Open https://supabase.com/dashboard/project/volaahbzuugmuefpjzhu
 --   2. Click "SQL Editor" in the left sidebar.
 --   3. Click "New query".
 --   4. Paste the entire contents of this file.
