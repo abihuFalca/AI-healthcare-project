@@ -232,8 +232,9 @@ def init_db():
 
 def seed_initial_data(conn):
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM users;")
-    if cursor.fetchone()[0] > 0:
+    cursor.execute("SELECT COUNT(*) as count FROM users;")
+    row = cursor.fetchone()
+    if row and row['count'] > 0:
         return  # Already seeded
 
     now = datetime.now()

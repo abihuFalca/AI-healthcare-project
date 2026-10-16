@@ -6,8 +6,8 @@ import {
 
 export default function LoginView({ onLoginSuccess }) {
   const [activeTab, setActiveTab] = useState('login'); // login, register_patient, register_doctor
-  const [loginInput, setLoginInput] = useState('patient@demo.com');
-  const [password, setPassword] = useState('demo123');
+  const [loginInput, setLoginInput] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,14 +47,35 @@ export default function LoginView({ onLoginSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login: loginInput, password: password })
       });
+      
+      // Handle non-OK status codes
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Login failed');
+        let errorDetail = 'Login failed';
+        try {
+          const errorData = await res.json();
+          errorDetail = errorData.detail || errorDetail;
+        } catch (e) {
+          // Response wasn't valid JSON, use default error
+        }
+        throw new Error(errorDetail);
       }
-      const data = await res.json();
+
+      // Parse response safely
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error('Server response was not valid JSON. Please check your connection and try again.');
+      }
+
+      // Validate required fields in response
+      if (!data.access_token || !data.user) {
+        throw new Error('Invalid login response from server');
+      }
+
       onLoginSuccess(data.user, data.access_token);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred during login');
     } finally {
       setLoading(false);
     }
@@ -72,13 +93,20 @@ export default function LoginView({ onLoginSuccess }) {
       body: JSON.stringify({ login: email, password: pwd })
     })
       .then(res => {
-        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || 'Login failed'); });
-        return res.json();
+        if (!res.ok) {
+          return res.json().then(e => { throw new Error(e.detail || 'Login failed'); });
+        }
+        return res.json().catch(err => {
+          throw new Error('Server response was not valid JSON');
+        });
       })
       .then(data => {
+        if (!data.access_token || !data.user) {
+          throw new Error('Invalid login response from server');
+        }
         onLoginSuccess(data.user, data.access_token);
       })
-      .catch(err => setError(err.message))
+      .catch(err => setError(err.message || 'An unexpected error occurred'))
       .finally(() => setLoading(false));
   };
 
@@ -93,13 +121,24 @@ export default function LoginView({ onLoginSuccess }) {
         body: JSON.stringify(patForm)
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Registration failed');
+        let errorDetail = 'Registration failed';
+        try {
+          const errorData = await res.json();
+          errorDetail = errorData.detail || errorDetail;
+        } catch (e) {
+          // Response wasn't valid JSON
+        }
+        throw new Error(errorDetail);
       }
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error('Server response was not valid JSON');
+      }
       onLoginSuccess(data.user, data.access_token);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -116,13 +155,24 @@ export default function LoginView({ onLoginSuccess }) {
         body: JSON.stringify(docForm)
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || 'Clinician registration failed');
+        let errorDetail = 'Clinician registration failed';
+        try {
+          const errorData = await res.json();
+          errorDetail = errorData.detail || errorDetail;
+        } catch (e) {
+          // Response wasn't valid JSON
+        }
+        throw new Error(errorDetail);
       }
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        throw new Error('Server response was not valid JSON');
+      }
       onLoginSuccess(data.user, data.access_token);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -328,7 +378,7 @@ export default function LoginView({ onLoginSuccess }) {
                     type="text"
                     required
                     className="form-input"
-                    placeholder="patient@demo.com or +1-555..."
+                    placeholder="Enter your email address or phone number"
                     value={loginInput}
                     onChange={e => setLoginInput(e.target.value)}
                   />
