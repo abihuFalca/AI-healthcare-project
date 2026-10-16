@@ -130,25 +130,25 @@ export default function PatientDashboard({ user, token, onStartAssessment, onVie
             <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Blood Pressure</div>
               <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>
-                {latest?.systolic_bp ? `${latest.systolic_bp}/${latest.diastolic_bp}` : '128/82'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>mmHg</span>
+                {latest?.systolic_bp ? `${latest.systolic_bp}/${latest.diastolic_bp}` : '--'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>mmHg</span>
               </div>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Heart Rate</div>
               <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>
-                {latest?.heart_rate || '72'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>bpm</span>
+                {latest?.heart_rate ? `${latest.heart_rate}` : '--'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>bpm</span>
               </div>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Oxygen (SpO₂)</div>
               <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>
-                {latest?.spo2 || '98'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>%</span>
+                {latest?.spo2 ? `${latest.spo2}` : '--'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>%</span>
               </div>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Calculated BMI</div>
               <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#0f172a' }}>
-                {p.bmi || '27.1'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>kg/m²</span>
+                {p.bmi ? `${p.bmi}` : '--'} <span style={{ fontSize: '0.7rem', fontWeight: 'normal' }}>kg/m²</span>
               </div>
             </div>
           </div>
@@ -160,10 +160,10 @@ export default function PatientDashboard({ user, token, onStartAssessment, onVie
             Medical Profile Summary
           </span>
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.825rem' }}>
-            <div><strong>Age:</strong> {p.date_of_birth ? `${new Date().getFullYear() - new Date(p.date_of_birth).getFullYear()} yrs` : '58 yrs'} ({p.gender || 'Male'})</div>
-            <div><strong>Active Conditions:</strong> {profileData?.medical_history?.map(h => h.condition).join(', ') || 'Hypertension'}</div>
-            <div><strong>Medications:</strong> {profileData?.medications?.map(m => m.medication_name).join(', ') || 'Amlodipine'}</div>
-            <div><strong>Emergency Contact:</strong> {p.emergency_contact || 'Registered'}</div>
+            <div><strong>Age:</strong> {p.date_of_birth ? `${new Date().getFullYear() - new Date(p.date_of_birth).getFullYear()} yrs` : '--'} ({p.gender || 'Not specified'})</div>
+            <div><strong>Active Conditions:</strong> {profileData?.medical_history && profileData.medical_history.length > 0 ? profileData.medical_history.map(h => h.condition).join(', ') : 'None recorded'}</div>
+            <div><strong>Medications:</strong> {profileData?.medications && profileData.medications.length > 0 ? profileData.medications.map(m => m.medication_name).join(', ') : 'None recorded'}</div>
+            <div><strong>Emergency Contact:</strong> {p.emergency_contact || 'None registered'}</div>
           </div>
         </div>
       </div>

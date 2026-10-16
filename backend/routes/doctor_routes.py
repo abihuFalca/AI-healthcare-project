@@ -20,21 +20,28 @@ def get_doctor_dashboard(user: dict = Depends(require_role(["HEALTHCARE_WORKER",
     conn = get_db()
     cursor = conn.cursor()
 
+    def _extract_count(res):
+        if not res:
+            return 0
+        if isinstance(res, dict):
+            return next(iter(res.values()), 0)
+        return res[0]
+
     # Total unique patients
     cursor.execute("SELECT COUNT(*) FROM patient_profiles")
-    total_patients = cursor.fetchone()[0]
+    total_patients = _extract_count(cursor.fetchone())
 
     # Pending reviews
     cursor.execute("SELECT COUNT(*) FROM healthcare_reviews WHERE review_status = 'PENDING'")
-    pending_reviews = cursor.fetchone()[0]
+    pending_reviews = _extract_count(cursor.fetchone())
 
     # High-risk assessments count
     cursor.execute("SELECT COUNT(*) FROM assessments WHERE risk_level = 'HIGH'")
-    high_risk_count = cursor.fetchone()[0]
+    high_risk_count = _extract_count(cursor.fetchone())
 
     # Moderate-risk count
     cursor.execute("SELECT COUNT(*) FROM assessments WHERE risk_level = 'MODERATE'")
-    mod_risk_count = cursor.fetchone()[0]
+    mod_risk_count = _extract_count(cursor.fetchone())
 
     # High-priority triage queue table
     cursor.execute("""
@@ -163,6 +170,9 @@ def get_patient_detail(id: int, user: dict = Depends(require_role(["HEALTHCARE_W
     
     profile = dict(p_row)
     profile["bmi"] = calculate_bmi(profile.get("height"), profile.get("weight"))
+
+    # Audit log access to patient clinical records (HIPAA / SEC-7 safeguard)
+    log_audit_event(user["id"], "VIEW_PATIENT_RECORDS", "PATIENT", str(id), f"Clinician {user['email']} accessed records for patient #{id}")
 
     # Conditions
     cursor.execute("SELECT * FROM medical_history WHERE patient_id = %s", (id,))

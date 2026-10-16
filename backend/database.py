@@ -1,4 +1,4 @@
-import psycopg2
+﻿import psycopg2
 import psycopg2.extras
 import os
 import json
@@ -231,7 +231,7 @@ def init_db():
     conn.close()
 
 def seed_initial_data(conn):
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT COUNT(*) as count FROM users;")
     row = cursor.fetchone()
     if row and row['count'] > 0:
@@ -247,43 +247,43 @@ def seed_initial_data(conn):
         INSERT INTO users (email, phone, password_hash, role, status, last_login, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, ("admin@healthsystem.org", "+1-800-555-0100", hash_password("demo123"), "ADMIN", "ACTIVE", now, month_ago))
-    admin_user_id = cursor.fetchone()[0]
+    admin_user_id = cursor.fetchone()['id']
 
     # 2. Approved Doctor (Dr. Sarah Chen, Cardiology)
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, last_login, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, ("doctor@hospital.com", "+1-555-019-2834", hash_password("demo123"), "HEALTHCARE_WORKER", "ACTIVE", yesterday, month_ago))
-    doc1_user_id = cursor.fetchone()[0]
+    doc1_user_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO healthcare_workers (user_id, full_name, professional_role, professional_id, hospital_name, department, verification_status, verified_at, verified_by_user_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, (doc1_user_id, "Dr. Sarah Chen, MD", "Cardiologist / Lead Triage Clinician", "MD-NY-84920", "St. Jude Metropolitan Hospital", "Cardiology & Emergency Triage", "APPROVED", month_ago, 1))
-    doc1_id = cursor.fetchone()[0]
+    doc1_id = cursor.fetchone()['id']
 
     # 3. Pending Doctor (Dr. Alex Patel, Needs verification for ADM-3 demo!)
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, last_login, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, ("newdoc@clinic.com", "+1-555-014-9988", hash_password("demo123"), "HEALTHCARE_WORKER", "PENDING", None, yesterday))
-    doc2_user_id = cursor.fetchone()[0]
+    doc2_user_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO healthcare_workers (user_id, full_name, professional_role, professional_id, hospital_name, department, verification_status, verified_at, verified_by_user_id)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, (doc2_user_id, "Dr. Alex Patel, MD", "Emergency Medicine Resident", "MED-RES-2026-441", "City General Trauma Center", "Emergency Medicine", "PENDING", None, None))
-    doc2_id = cursor.fetchone()[0]
+    doc2_id = cursor.fetchone()['id']
 
     # 4. Patient: John Doe (Section 15 Demo Scenario: Age 58, hypertension history)
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, last_login, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, ("patient@demo.com", "+1-555-012-3456", hash_password("demo123"), "PATIENT", "ACTIVE", now, month_ago))
-    pat1_user_id = cursor.fetchone()[0]
+    pat1_user_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO patient_profiles (user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency_contact, consent_accepted, consent_accepted_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id
     """, (pat1_user_id, "John Doe", "1968-04-12", "Male", 178, 86, "English", "Mary Doe (Spouse) - 555-012-3457", month_ago))
-    pat1_id = cursor.fetchone()[0]
+    pat1_id = cursor.fetchone()['id']
 
     # John Doe Medical History (Section 15 Demo: Hypertension)
     cursor.execute("""
@@ -321,7 +321,7 @@ def seed_initial_data(conn):
         "Routine healthcare consultation / monitoring. Continue current prescribed medications and log vitals regularly.",
         month_ago
     ))
-    past_asm1_id = cursor.fetchone()[0]
+    past_asm1_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO patient_vitals (patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate, spo2, temperature, respiratory_rate, blood_glucose, recorded_at)
         VALUES (%s, %s, 128, 82, 72, 98, 36.8, 16, 95, %s)
@@ -349,7 +349,7 @@ def seed_initial_data(conn):
         "Prompt healthcare consultation. Schedule an in-person or telehealth review with your clinician within 48-72 hours to assess blood pressure control.",
         two_weeks_ago
     ))
-    past_asm2_id = cursor.fetchone()[0]
+    past_asm2_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO patient_vitals (patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate, spo2, temperature, respiratory_rate, blood_glucose, recorded_at)
         VALUES (%s, %s, 142, 90, 84, 97, 36.9, 17, 105, %s)
@@ -364,12 +364,12 @@ def seed_initial_data(conn):
         INSERT INTO users (email, phone, password_hash, role, status, last_login, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
     """, ("maria@example.com", "+1-555-017-8899", hash_password("demo123"), "PATIENT", "ACTIVE", yesterday, month_ago))
-    pat2_user_id = cursor.fetchone()[0]
+    pat2_user_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO patient_profiles (user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency_contact, consent_accepted, consent_accepted_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id
     """, (pat2_user_id, "Maria Garcia", "1962-09-22", "Female", 162, 74, "English", "Carlos Garcia - 555-017-8890", month_ago))
-    pat2_id = cursor.fetchone()[0]
+    pat2_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO medical_history (patient_id, condition, status, diagnosed_date, notes)
         VALUES (%s, %s, %s, %s, %s)
@@ -387,7 +387,7 @@ def seed_initial_data(conn):
         "Immediate clinical assessment. Markedly elevated glucose and osmotic symptoms warrant urgent evaluation.",
         yesterday
     ))
-    past_asm3_id = cursor.fetchone()[0]
+    past_asm3_id = cursor.fetchone()['id']
     cursor.execute("""
         INSERT INTO patient_vitals (patient_id, assessment_id, systolic_bp, diastolic_bp, heart_rate, spo2, temperature, respiratory_rate, blood_glucose, recorded_at)
         VALUES (%s, %s, 138, 88, 96, 97, 37.2, 20, 320, %s)
@@ -433,6 +433,7 @@ def seed_initial_data(conn):
         cursor.execute("""
             INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
             VALUES (%s, %s, %s, %s)
+            ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at
         """, (k, v, d, now))
 
     # Audit Logs (SEC-7, ADM-5)
@@ -455,3 +456,4 @@ def seed_initial_data(conn):
 if __name__ == '__main__':
     init_db()
     print("Database initialized successfully with Supabase PostgreSQL!")
+

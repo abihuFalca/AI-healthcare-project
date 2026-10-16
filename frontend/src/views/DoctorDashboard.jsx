@@ -69,10 +69,10 @@ export default function DoctorDashboard({ user, token, onSelectPatient }) {
             </span>
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800' }}>
-            {user.doctor_profile?.full_name || 'Dr. Sarah Chen, MD'}
+            {user.doctor_profile?.full_name || user.email?.split('@')[0] || 'Clinician Portal'}
           </h1>
           <p style={{ fontSize: '0.85rem', color: '#bae6fd' }}>
-            {user.doctor_profile?.professional_role || 'Lead Triage Clinician'} · {user.doctor_profile?.hospital_name || 'St. Jude Metropolitan Hospital'}
+            {user.doctor_profile?.professional_role || 'Healthcare Clinician'}{user.doctor_profile?.hospital_name ? ` · ${user.doctor_profile.hospital_name}` : ''}
           </p>
         </div>
 

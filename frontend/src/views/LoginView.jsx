@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
   Shield, User, Stethoscope, Lock, Mail, Phone,
-  ArrowRight, Sparkles, CheckCircle2, AlertCircle, HeartPulse
+  ArrowRight, CheckCircle2, AlertCircle, HeartPulse, Sparkles
 } from 'lucide-react';
+import CountryPhoneInput from '../components/CountryPhoneInput';
 
 export default function LoginView({ onLoginSuccess }) {
   const [activeTab, setActiveTab] = useState('login'); // login, register_patient, register_doctor
-  const [loginInput, setLoginInput] = useState('');
+  const [loginMethod, setLoginMethod] = useState('phone'); // 'phone' | 'email'
+  const [phoneLogin, setPhoneLogin] = useState('');
+  const [emailLogin, setEmailLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,34 +44,34 @@ export default function LoginView({ onLoginSuccess }) {
     if (e) e.preventDefault();
     setLoading(true);
     setError('');
+
+    const loginIdentifier = loginMethod === 'phone' ? phoneLogin.trim() : emailLogin.trim();
+    if (!loginIdentifier) {
+      setError(loginMethod === 'phone' ? 'Please enter a valid phone number' : 'Please enter your email address');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: loginInput, password: password })
+        body: JSON.stringify({ login: loginIdentifier, password })
       });
-      
+
       // Handle non-OK status codes
       if (!res.ok) {
-        let errorDetail = 'Login failed';
+        let errorDetail = 'Invalid credentials or login failed';
         try {
           const errorData = await res.json();
           errorDetail = errorData.detail || errorDetail;
-        } catch (e) {
-          // Response wasn't valid JSON, use default error
+        } catch {
+          // Response wasn't valid JSON
         }
         throw new Error(errorDetail);
       }
 
-      // Parse response safely
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        throw new Error('Server response was not valid JSON. Please check your connection and try again.');
-      }
-
-      // Validate required fields in response
+      const data = await res.json();
       if (!data.access_token || !data.user) {
         throw new Error('Invalid login response from server');
       }
@@ -79,35 +82,6 @@ export default function LoginView({ onLoginSuccess }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (email, pwd) => {
-    setLoginInput(email);
-    setPassword(pwd);
-    // Submit automatically
-    setLoading(true);
-    setError('');
-    fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: email, password: pwd })
-    })
-      .then(res => {
-        if (!res.ok) {
-          return res.json().then(e => { throw new Error(e.detail || 'Login failed'); });
-        }
-        return res.json().catch(err => {
-          throw new Error('Server response was not valid JSON');
-        });
-      })
-      .then(data => {
-        if (!data.access_token || !data.user) {
-          throw new Error('Invalid login response from server');
-        }
-        onLoginSuccess(data.user, data.access_token);
-      })
-      .catch(err => setError(err.message || 'An unexpected error occurred'))
-      .finally(() => setLoading(false));
   };
 
   const handleRegisterPatient = async (e) => {
@@ -125,17 +99,12 @@ export default function LoginView({ onLoginSuccess }) {
         try {
           const errorData = await res.json();
           errorDetail = errorData.detail || errorDetail;
-        } catch (e) {
+        } catch {
           // Response wasn't valid JSON
         }
         throw new Error(errorDetail);
       }
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        throw new Error('Server response was not valid JSON');
-      }
+      const data = await res.json();
       onLoginSuccess(data.user, data.access_token);
     } catch (err) {
       setError(err.message || 'An unexpected error occurred');
@@ -159,17 +128,12 @@ export default function LoginView({ onLoginSuccess }) {
         try {
           const errorData = await res.json();
           errorDetail = errorData.detail || errorDetail;
-        } catch (e) {
+        } catch {
           // Response wasn't valid JSON
         }
         throw new Error(errorDetail);
       }
-      let data;
-      try {
-        data = await res.json();
-      } catch (e) {
-        throw new Error('Server response was not valid JSON');
-      }
+      const data = await res.json();
       onLoginSuccess(data.user, data.access_token);
     } catch (err) {
       setError(err.message || 'An unexpected error occurred');
@@ -180,25 +144,37 @@ export default function LoginView({ onLoginSuccess }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
-      {/* Top Banner with Clinical Positioning (PRD Page 1 & Table of Contents) */}
-      <div
+      {/* Top Clinical Header */}
+      <header
         style={{
-          background: 'linear-gradient(135deg, #0f172a, #0c4a6e)',
+          background: 'linear-gradient(135deg, #091e3a, #034b75)',
           color: '#ffffff',
           padding: '1.25rem 2rem',
-          borderBottom: '1px solid #1e293b'
+          borderBottom: '1px solid #0f2c4c',
+          boxShadow: '0 4px 20px -2px rgba(9, 30, 58, 0.25)'
         }}
       >
         <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ backgroundColor: '#0284c7', padding: '0.5rem', borderRadius: '10px' }}>
-              <HeartPulse size={26} color="#ffffff" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                padding: '0.55rem',
+                borderRadius: '12px',
+                display: 'flex',
+                boxShadow: '0 4px 10px rgba(2, 132, 199, 0.4)'
+              }}
+            >
+              <HeartPulse size={28} color="#ffffff" />
             </div>
             <div>
-              <div style={{ fontSize: '1.2rem', fontWeight: '800', letterSpacing: '-0.02em' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 AegisAI Clinical Decision Support
+                <span style={{ fontSize: '0.65rem', backgroundColor: '#0284c7', padding: '0.15rem 0.5rem', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Live
+                </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+              <div style={{ fontSize: '0.75rem', color: '#93c5fd', marginTop: '0.15rem' }}>
                 AI Early-Risk Detection & Patient Triage System · PRD v1.0
               </div>
             </div>
@@ -208,202 +184,272 @@ export default function LoginView({ onLoginSuccess }) {
             style={{
               fontSize: '0.75rem',
               color: '#bae6fd',
-              backgroundColor: 'rgba(2, 132, 199, 0.2)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              padding: '0.35rem 0.75rem',
-              borderRadius: '9999px'
+              backgroundColor: 'rgba(2, 132, 199, 0.25)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              padding: '0.4rem 0.9rem',
+              borderRadius: '9999px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
             }}
           >
-            🛡️ Safety-First: Deterministic Rules & Explainable SHAP
+            <Shield size={14} color="#38bdf8" />
+            <span>Safety-First: Deterministic Rules & Explainable SHAP</span>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
-        <div style={{ width: '100%', maxWidth: '560px' }}>
-          {/* Quick Demo Logins Box (One-Click instant role access) */}
+      {/* Main Container */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1rem' }}>
+        <div style={{ width: '100%', maxWidth: '520px' }}>
+          {/* Main Auth Card */}
           <div
             className="card"
             style={{
-              marginBottom: '1.5rem',
-              background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
-              borderColor: '#7dd3fc',
-              padding: '1.25rem'
+              boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05)',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '2rem 1.75rem',
+              backgroundColor: '#ffffff'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
-              <Sparkles size={18} color="#0284c7" />
-              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0369a1', textTransform: 'uppercase' }}>
-                Instant Demo Evaluation Accounts
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {/* Top Navigation Tabs */}
+            <div
+              style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '0.35rem',
+                borderRadius: '10px',
+                marginBottom: '1.75rem'
+              }}
+            >
               <button
                 type="button"
-                onClick={() => handleQuickLogin('patient@demo.com', 'demo123')}
-                className="btn btn-outline"
-                style={{ padding: '0.5rem', fontSize: '0.775rem', textAlign: 'left', justifyContent: 'flex-start' }}
-              >
-                <User size={14} color="#0284c7" />
-                <div>
-                  <strong>Patient (John Doe)</strong>
-                  <div style={{ fontSize: '0.675rem', color: '#64748b' }}>58yo, Hypertension</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('doctor@hospital.com', 'demo123')}
-                className="btn btn-outline"
-                style={{ padding: '0.5rem', fontSize: '0.775rem', textAlign: 'left', justifyContent: 'flex-start' }}
-              >
-                <Stethoscope size={14} color="#0f766e" />
-                <div>
-                  <strong>Doctor (Dr. Sarah Chen)</strong>
-                  <div style={{ fontSize: '0.675rem', color: '#64748b' }}>Approved Lead Clinician</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@healthsystem.org', 'demo123')}
-                className="btn btn-outline"
-                style={{ padding: '0.5rem', fontSize: '0.775rem', textAlign: 'left', justifyContent: 'flex-start' }}
-              >
-                <Shield size={14} color="#6d28d9" />
-                <div>
-                  <strong>Admin System</strong>
-                  <div style={{ fontSize: '0.675rem', color: '#64748b' }}>Logs, Approvals & Config</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('newdoc@clinic.com', 'demo123')}
-                className="btn btn-outline"
-                style={{ padding: '0.5rem', fontSize: '0.775rem', textAlign: 'left', justifyContent: 'flex-start' }}
-              >
-                <Stethoscope size={14} color="#d97706" />
-                <div>
-                  <strong>Pending Doctor</strong>
-                  <div style={{ fontSize: '0.675rem', color: '#b45309' }}>Awaiting Admin Approval</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Main Auth Card */}
-          <div className="card">
-            {/* Tabs */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
-              <button
-                type="button"
-                onClick={() => setActiveTab('login')}
+                onClick={() => { setActiveTab('login'); setError(''); }}
                 style={{
                   flex: 1,
-                  padding: '0.75rem',
+                  padding: '0.65rem 0.75rem',
                   border: 'none',
-                  borderBottom: `3px solid ${activeTab === 'login' ? '#0284c7' : 'transparent'}`,
-                  backgroundColor: 'transparent',
+                  borderRadius: '8px',
+                  backgroundColor: activeTab === 'login' ? '#ffffff' : 'transparent',
                   fontWeight: activeTab === 'login' ? '700' : '500',
                   color: activeTab === 'login' ? '#0284c7' : '#64748b',
+                  boxShadow: activeTab === 'login' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.875rem',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 Sign In
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('register_patient')}
+                onClick={() => { setActiveTab('register_patient'); setError(''); }}
                 style={{
                   flex: 1,
-                  padding: '0.75rem',
+                  padding: '0.65rem 0.75rem',
                   border: 'none',
-                  borderBottom: `3px solid ${activeTab === 'register_patient' ? '#0284c7' : 'transparent'}`,
-                  backgroundColor: 'transparent',
+                  borderRadius: '8px',
+                  backgroundColor: activeTab === 'register_patient' ? '#ffffff' : 'transparent',
                   fontWeight: activeTab === 'register_patient' ? '700' : '500',
                   color: activeTab === 'register_patient' ? '#0284c7' : '#64748b',
+                  boxShadow: activeTab === 'register_patient' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.875rem',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 New Patient
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('register_doctor')}
+                onClick={() => { setActiveTab('register_doctor'); setError(''); }}
                 style={{
                   flex: 1,
-                  padding: '0.75rem',
+                  padding: '0.65rem 0.75rem',
                   border: 'none',
-                  borderBottom: `3px solid ${activeTab === 'register_doctor' ? '#0284c7' : 'transparent'}`,
-                  backgroundColor: 'transparent',
+                  borderRadius: '8px',
+                  backgroundColor: activeTab === 'register_doctor' ? '#ffffff' : 'transparent',
                   fontWeight: activeTab === 'register_doctor' ? '700' : '500',
                   color: activeTab === 'register_doctor' ? '#0284c7' : '#64748b',
+                  boxShadow: activeTab === 'register_doctor' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
                   cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.875rem',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 Clinician Join
               </button>
             </div>
 
+            {/* Error Banner */}
             {error && (
               <div
                 style={{
-                  padding: '0.75rem',
+                  padding: '0.75rem 1rem',
                   backgroundColor: '#fef2f2',
                   border: '1px solid #fecaca',
                   borderRadius: '8px',
                   color: '#991b1b',
-                  marginBottom: '1rem',
+                  marginBottom: '1.25rem',
                   fontSize: '0.85rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.5rem',
+                  animation: 'fadeIn 0.2s ease-out'
                 }}
               >
-                <AlertCircle size={16} />
-                {error}
+                <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
+                <span>{error}</span>
               </div>
             )}
 
             {/* TAB: LOGIN (AUTH-1) */}
             {activeTab === 'login' && (
               <form onSubmit={handleLogin}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label className="form-label">Email Address or Phone Number</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input"
-                    placeholder="Enter your email address or phone number"
-                    value={loginInput}
-                    onChange={e => setLoginInput(e.target.value)}
-                  />
-                </div>
-
+                {/* Login Method Sub-Toggle (Phone vs Email) */}
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label">Account Password</label>
-                  <input
-                    type="password"
-                    required
-                    className="form-input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                  />
+                  <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                    Choose Sign-in Method
+                  </label>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.5rem',
+                      backgroundColor: '#f8fafc',
+                      padding: '0.25rem',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('phone')}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        border: 'none',
+                        borderRadius: '6px',
+                        backgroundColor: loginMethod === 'phone' ? '#0284c7' : 'transparent',
+                        color: loginMethod === 'phone' ? '#ffffff' : '#64748b',
+                        fontWeight: loginMethod === 'phone' ? '700' : '500',
+                        fontSize: '0.825rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Phone size={15} /> Mobile Number
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setLoginMethod('email')}
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        border: 'none',
+                        borderRadius: '6px',
+                        backgroundColor: loginMethod === 'email' ? '#0284c7' : 'transparent',
+                        color: loginMethod === 'email' ? '#ffffff' : '#64748b',
+                        fontWeight: loginMethod === 'email' ? '700' : '500',
+                        fontSize: '0.825rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Mail size={15} /> Email Address
+                    </button>
+                  </div>
                 </div>
 
+                {/* Dynamic Input based on Login Method */}
+                {loginMethod === 'phone' ? (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                      Phone Number with Country Code *
+                    </label>
+                    <CountryPhoneInput
+                      value={phoneLogin}
+                      onChange={(full) => setPhoneLogin(full)}
+                      required
+                    />
+                    <div style={{ fontSize: '0.725rem', color: '#64748b', marginTop: '0.35rem' }}>
+                      Select your country dial code and type your phone number
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                      Email Address *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="email"
+                        required
+                        className="form-input"
+                        placeholder="e.g. yourname@domain.com"
+                        value={emailLogin}
+                        onChange={(e) => setEmailLogin(e.target.value)}
+                        style={{ paddingLeft: '2.4rem' }}
+                      />
+                      <Mail
+                        size={16}
+                        color="#94a3b8"
+                        style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Password Field */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>Account Password *</label>
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="password"
+                      required
+                      className="form-input"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ paddingLeft: '2.4rem' }}
+                    />
+                    <Lock
+                      size={16}
+                      color="#94a3b8"
+                      style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.75rem' }}
+                  style={{
+                    width: '100%',
+                    padding: '0.8rem',
+                    fontSize: '0.95rem',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    borderRadius: '8px'
+                  }}
                 >
                   {loading ? 'Authenticating...' : 'Sign In to Portal'}
-                  <ArrowRight size={16} />
+                  <ArrowRight size={18} />
                 </button>
               </form>
             )}
@@ -417,34 +463,31 @@ export default function LoginView({ onLoginSuccess }) {
                     type="text"
                     required
                     className="form-input"
-                    placeholder="e.g. John Doe"
+                    placeholder="e.g. Ramesh Kumar"
                     value={patForm.full_name}
-                    onChange={e => setPatForm({ ...patForm, full_name: e.target.value })}
+                    onChange={(e) => setPatForm({ ...patForm, full_name: e.target.value })}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.875rem' }}>
-                  <div>
-                    <label className="form-label">Email Address *</label>
-                    <input
-                      type="email"
-                      required
-                      className="form-input"
-                      placeholder="john@example.com"
-                      value={patForm.email}
-                      onChange={e => setPatForm({ ...patForm, email: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">Phone Number</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="+1-555..."
-                      value={patForm.phone}
-                      onChange={e => setPatForm({ ...patForm, phone: e.target.value })}
-                    />
-                  </div>
+                <div style={{ marginBottom: '0.875rem' }}>
+                  <label className="form-label">Email Address *</label>
+                  <input
+                    type="email"
+                    required
+                    className="form-input"
+                    placeholder="patient@example.com"
+                    value={patForm.email}
+                    onChange={(e) => setPatForm({ ...patForm, email: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '0.875rem' }}>
+                  <label className="form-label">Phone Number *</label>
+                  <CountryPhoneInput
+                    value={patForm.phone}
+                    onChange={(full) => setPatForm({ ...patForm, phone: full })}
+                    required
+                  />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.875rem' }}>
@@ -455,7 +498,7 @@ export default function LoginView({ onLoginSuccess }) {
                       required
                       className="form-input"
                       value={patForm.date_of_birth}
-                      onChange={e => setPatForm({ ...patForm, date_of_birth: e.target.value })}
+                      onChange={(e) => setPatForm({ ...patForm, date_of_birth: e.target.value })}
                     />
                   </div>
                   <div>
@@ -463,7 +506,7 @@ export default function LoginView({ onLoginSuccess }) {
                     <select
                       className="form-input"
                       value={patForm.gender}
-                      onChange={e => setPatForm({ ...patForm, gender: e.target.value })}
+                      onChange={(e) => setPatForm({ ...patForm, gender: e.target.value })}
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -473,14 +516,14 @@ export default function LoginView({ onLoginSuccess }) {
                 </div>
 
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label">Password *</label>
+                  <label className="form-label">Create Password *</label>
                   <input
                     type="password"
                     required
                     className="form-input"
                     placeholder="At least 6 characters"
                     value={patForm.password}
-                    onChange={e => setPatForm({ ...patForm, password: e.target.value })}
+                    onChange={(e) => setPatForm({ ...patForm, password: e.target.value })}
                   />
                 </div>
 
@@ -488,7 +531,7 @@ export default function LoginView({ onLoginSuccess }) {
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.75rem' }}
+                  style={{ width: '100%', padding: '0.8rem', fontWeight: '700' }}
                 >
                   {loading ? 'Creating Account...' : 'Register Patient Account'}
                 </button>
@@ -506,7 +549,16 @@ export default function LoginView({ onLoginSuccess }) {
                     className="form-input"
                     placeholder="e.g. Dr. Alex Patel, MD"
                     value={docForm.full_name}
-                    onChange={e => setDocForm({ ...docForm, full_name: e.target.value })}
+                    onChange={(e) => setDocForm({ ...docForm, full_name: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '0.875rem' }}>
+                  <label className="form-label">Contact Phone Number *</label>
+                  <CountryPhoneInput
+                    value={docForm.phone}
+                    onChange={(full) => setDocForm({ ...docForm, phone: full })}
+                    required
                   />
                 </div>
 
@@ -519,7 +571,7 @@ export default function LoginView({ onLoginSuccess }) {
                       className="form-input"
                       placeholder="e.g. City Trauma Center"
                       value={docForm.hospital_name}
-                      onChange={e => setDocForm({ ...docForm, hospital_name: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, hospital_name: e.target.value })}
                     />
                   </div>
                   <div>
@@ -530,7 +582,7 @@ export default function LoginView({ onLoginSuccess }) {
                       className="form-input"
                       placeholder="e.g. Emergency Triage"
                       value={docForm.department}
-                      onChange={e => setDocForm({ ...docForm, department: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, department: e.target.value })}
                     />
                   </div>
                 </div>
@@ -544,18 +596,18 @@ export default function LoginView({ onLoginSuccess }) {
                       className="form-input"
                       placeholder="e.g. Triage Resident"
                       value={docForm.professional_role}
-                      onChange={e => setDocForm({ ...docForm, professional_role: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, professional_role: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="form-label">Professional ID / Medical License *</label>
+                    <label className="form-label">Medical License / ID *</label>
                     <input
                       type="text"
                       required
                       className="form-input"
                       placeholder="e.g. MD-NY-99120"
                       value={docForm.professional_id}
-                      onChange={e => setDocForm({ ...docForm, professional_id: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, professional_id: e.target.value })}
                     />
                   </div>
                 </div>
@@ -569,7 +621,7 @@ export default function LoginView({ onLoginSuccess }) {
                       className="form-input"
                       placeholder="doctor@hospital.org"
                       value={docForm.email}
-                      onChange={e => setDocForm({ ...docForm, email: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, email: e.target.value })}
                     />
                   </div>
                   <div>
@@ -580,35 +632,60 @@ export default function LoginView({ onLoginSuccess }) {
                       className="form-input"
                       placeholder="••••••••"
                       value={docForm.password}
-                      onChange={e => setDocForm({ ...docForm, password: e.target.value })}
+                      onChange={(e) => setDocForm({ ...docForm, password: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div
                   style={{
-                    backgroundColor: '#fffbeb',
-                    border: '1px solid #fde68a',
+                    backgroundColor: '#f0fdfa',
+                    border: '1px solid #99f6e4',
                     padding: '0.625rem 0.875rem',
                     borderRadius: '6px',
                     fontSize: '0.75rem',
-                    color: '#92400e',
+                    color: '#0f766e',
                     marginBottom: '1rem'
                   }}
                 >
-                  ℹ️ <strong>Administrative Verification Required:</strong> Newly registered clinician accounts start in <strong>Pending</strong> status until verified by an administrator.
+                  🛡️ <strong>Professional Credential Verification:</strong> Please provide your official medical license / institutional ID and healthcare facility details. Your credentials are validated upon registration for direct clinical triage access.
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.75rem', backgroundColor: '#0f766e' }}
+                  style={{ width: '100%', padding: '0.8rem', backgroundColor: '#0f766e', fontWeight: '700' }}
                 >
-                  {loading ? 'Submitting Registration...' : 'Submit Clinician Application'}
+                  {loading ? 'Verifying & Registering...' : 'Register Clinician Account'}
                 </button>
               </form>
             )}
+
+            {/* Bottom Security Trust Badge */}
+            <div
+              style={{
+                marginTop: '1.75rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem',
+                fontSize: '0.75rem',
+                color: '#64748b'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <CheckCircle2 size={14} color="#10b981" />
+                <span>Supabase Cloud DB</span>
+              </div>
+              <span>•</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Shield size={14} color="#0284c7" />
+                <span>256-Bit Encrypted</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

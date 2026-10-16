@@ -126,98 +126,62 @@ export default function Navbar({ user, token, onLogout, onNavigate, activePage, 
               </button>
             </>
           )}
-
-          {user.role === 'ADMIN' && (
-            <>
-              <button
-                onClick={() => onNavigate('dashboard')}
-                className={`btn btn-sm ${activePage === 'dashboard' ? 'btn-primary' : 'btn-outline'}`}
-              >
-                Admin Control Center
-              </button>
-            </>
-          )}
         </div>
 
         {/* Right side controls: Role Badge, Quick Demo Switcher, Notifications, Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', position: 'relative' }}>
-          {/* Quick Demo Switcher */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-              className="btn btn-outline btn-sm"
+          {/* Authenticated User Identity Chip */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              padding: '0.35rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.8rem'
+            }}
+          >
+            {user.role === 'HEALTHCARE_WORKER' ? (
+              <Stethoscope size={15} color="#0f766e" />
+            ) : user.role === 'ADMIN' ? (
+              <Shield size={15} color="#6d28d9" />
+            ) : (
+              <User size={15} color="#0284c7" />
+            )}
+            <span style={{ fontWeight: '700', color: '#0f172a' }}>
+              {user.doctor_profile?.full_name || user.profile?.full_name || user.email?.split('@')[0] || 'User'}
+            </span>
+            <span
               style={{
-                borderColor: '#7dd3fc',
-                backgroundColor: '#f0f9ff',
-                color: '#0369a1',
-                fontWeight: '700'
+                fontSize: '0.675rem',
+                fontWeight: '700',
+                padding: '0.15rem 0.5rem',
+                borderRadius: '9999px',
+                backgroundColor:
+                  user.role === 'HEALTHCARE_WORKER'
+                    ? '#f0fdfa'
+                    : user.role === 'ADMIN'
+                    ? '#f5f3ff'
+                    : '#f0f9ff',
+                color:
+                  user.role === 'HEALTHCARE_WORKER'
+                    ? '#0f766e'
+                    : user.role === 'ADMIN'
+                    ? '#6d28d9'
+                    : '#0284c7',
+                border: `1px solid ${
+                  user.role === 'HEALTHCARE_WORKER'
+                    ? '#99f6e4'
+                    : user.role === 'ADMIN'
+                    ? '#ddd6fe'
+                    : '#bae6fd'
+                }`
               }}
             >
-              <Sparkles size={14} color="#0284c7" />
-              Role: {user.role === 'HEALTHCARE_WORKER' ? 'Doctor' : user.role === 'ADMIN' ? 'Admin' : 'Patient'}
-              <ChevronDown size={14} />
-            </button>
-
-            {showRoleDropdown && (
-              <div
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '110%',
-                  width: '260px',
-                  backgroundColor: '#ffffff',
-                  borderRadius: '10px',
-                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
-                  border: '1px solid #e2e8f0',
-                  padding: '0.5rem',
-                  zIndex: 100
-                }}
-              >
-                <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', padding: '0.4rem 0.5rem' }}>
-                  SWITCH DEMO USER:
-                </div>
-                <button
-                  onClick={() => { setShowRoleDropdown(false); onQuickSwitchRole('patient@demo.com', 'demo123'); }}
-                  style={{ width: '100%', textAlign: 'left', padding: '0.5rem', border: 'none', background: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}
-                >
-                  <User size={14} color="#0284c7" />
-                  <div>
-                    <div style={{ fontWeight: '700' }}>Patient: John Doe</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>58yo Hypertension Demo</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { setShowRoleDropdown(false); onQuickSwitchRole('doctor@hospital.com', 'demo123'); }}
-                  style={{ width: '100%', textAlign: 'left', padding: '0.5rem', border: 'none', background: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}
-                >
-                  <Stethoscope size={14} color="#0f766e" />
-                  <div>
-                    <div style={{ fontWeight: '700' }}>Doctor: Dr. Sarah Chen</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Approved Lead Clinician</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { setShowRoleDropdown(false); onQuickSwitchRole('newdoc@clinic.com', 'demo123'); }}
-                  style={{ width: '100%', textAlign: 'left', padding: '0.5rem', border: 'none', background: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}
-                >
-                  <Clock size={14} color="#d97706" />
-                  <div>
-                    <div style={{ fontWeight: '700' }}>Doctor: Dr. Alex Patel</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Pending Verification (ADM-3)</div>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { setShowRoleDropdown(false); onQuickSwitchRole('admin@healthsystem.org', 'demo123'); }}
-                  style={{ width: '100%', textAlign: 'left', padding: '0.5rem', border: 'none', background: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}
-                >
-                  <Shield size={14} color="#6d28d9" />
-                  <div>
-                    <div style={{ fontWeight: '700' }}>System Administrator</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Logs & Configuration</div>
-                  </div>
-                </button>
-              </div>
-            )}
+              {user.role === 'HEALTHCARE_WORKER' ? 'Clinician' : user.role === 'ADMIN' ? 'Admin' : 'Patient'}
+            </span>
           </div>
 
           {/* Notifications Bell */}

@@ -64,34 +64,6 @@ export default function AssessmentWizard({ onComplete, onCancel, token }) {
     'Smoking', 'Alcohol use', 'Family History', 'Obesity', 'Physical inactivity'
   ];
 
-  // Helper to load Hackathon Demo Scenario (PRD Section 15)
-  const loadDemoScenario = () => {
-    setFormData({
-      age: 58,
-      gender: 'Male',
-      height: 178,
-      weight: 86,
-      symptomText: 'I have chest discomfort and dizziness for 3 hours and I am sweating.',
-      selectedSymptoms: ['chest discomfort', 'dizziness', 'sweating'],
-      extractedSymptoms: ['chest discomfort', 'dizziness', 'sweating'],
-      duration: '3 hours',
-      severity: 'Moderate',
-      medicalHistory: ['Hypertension'],
-      medications: [{ name: 'Amlodipine', dosage: '5mg', frequency: 'Once daily' }],
-      riskFactors: ['Smoking', 'Family History'],
-      vitals: {
-        systolic_bp: 165,
-        diastolic_bp: 100,
-        heart_rate: 108,
-        spo2: 96,
-        temperature: 37.1,
-        respiratory_rate: 18,
-        blood_glucose: 110
-      }
-    });
-    setStep(2); // Jump to symptoms so user sees the NLP inputs
-  };
-
   // NLP extraction trigger (PRD Section 6.5)
   const runNlpExtraction = async () => {
     if (!formData.symptomText.trim()) return;
@@ -195,46 +167,18 @@ export default function AssessmentWizard({ onComplete, onCancel, token }) {
 
   return (
     <div className="container" style={{ maxWidth: '820px' }}>
-      {/* Top Banner: One-Click Demo Scenario (PRD Section 15) */}
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #0284c7, #0369a1)',
-          color: 'white',
-          padding: '0.875rem 1.25rem',
-          borderRadius: '12px',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-          boxShadow: '0 4px 6px rgba(2, 132, 199, 0.2)'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <Sparkles size={20} color="#fef08a" />
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '0.925rem' }}>
-              Hackathon Evaluation Mode (PRD Section 15)
-            </div>
-            <div style={{ fontSize: '0.775rem', color: '#bae6fd' }}>
-              John Doe, 58yo, Chest Discomfort, BP 165/100, HR 108
-            </div>
-          </div>
+      {/* Header Clinical Title */}
+      <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#0f172a' }}>
+            Clinical Risk Assessment Protocol
+          </h1>
+          <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+            Evidence-based 7-step health triage & physiological risk stratification
+          </p>
         </div>
-        <button
-          onClick={loadDemoScenario}
-          className="btn"
-          style={{
-            backgroundColor: '#ffffff',
-            color: '#0369a1',
-            fontSize: '0.8rem',
-            padding: '0.4rem 0.85rem'
-          }}
-        >
-          <Zap size={14} /> Auto-Fill Demo Scenario
-        </button>
       </div>
+
 
       <div className="card">
         {/* Step Progress Indicators (7 Steps) */}

@@ -38,11 +38,11 @@ export default function PendingDoctorView({ user, onRefresh, onLogout }) {
         </span>
 
         <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#0f172a', marginTop: '1rem', marginBottom: '0.5rem' }}>
-          Clinician Account Awaiting Administrative Approval
+          Clinician Account Verification In Progress
         </h2>
 
         <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: '1.5', marginBottom: '1.5rem' }}>
-          Welcome, <strong>{doc.full_name || 'Clinician'}</strong>. Your professional license and institutional affiliation are currently being verified by system administration.
+          Welcome, <strong>{doc.full_name || 'Clinician'}</strong>. Your professional license and institutional affiliation are currently being processed.
         </p>
 
         <div
@@ -74,12 +74,12 @@ export default function PendingDoctorView({ user, onRefresh, onLogout }) {
             textAlign: 'left'
           }}
         >
-          🔒 <strong>Privacy & Governance Guarantee:</strong> In compliance with clinical regulatory requirements, protected health information (PHI) and patient triage records remain locked until an administrator approves this account in the Admin Portal.
+          🔒 <strong>Privacy & Governance Guarantee:</strong> In compliance with clinical regulatory requirements, protected health information (PHI) and patient triage records remain locked until clinical credentials are fully verified.
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
           <button onClick={onRefresh} className="btn btn-primary">
-            <RefreshCw size={16} /> Check Approval Status
+            <RefreshCw size={16} /> Refresh Verification Status
           </button>
           <button onClick={onLogout} className="btn btn-outline">
             Sign Out

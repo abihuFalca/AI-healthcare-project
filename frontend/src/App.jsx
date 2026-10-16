@@ -56,19 +56,19 @@ export default function App() {
     localStorage.removeItem('med_user');
   };
 
-  const handleQuickSwitchRole = async (email, password) => {
+  const handleRefreshProfile = async () => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: email, password: password })
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        handleLoginSuccess(data.user, data.access_token);
+        if (data.user) {
+          setUser(data.user);
+        }
       }
     } catch (err) {
-      console.error('Quick switch error:', err);
+      console.error('Refresh profile error:', err);
     }
   };
 
@@ -112,11 +112,10 @@ export default function App() {
           onLogout={handleLogout}
           onNavigate={() => {}}
           activePage="pending"
-          onQuickSwitchRole={handleQuickSwitchRole}
         />
         <PendingDoctorView
           user={user}
-          onRefresh={() => handleQuickSwitchRole(user.email, 'demo123')}
+          onRefresh={handleRefreshProfile}
           onLogout={handleLogout}
         />
       </div>
@@ -131,7 +130,6 @@ export default function App() {
         onLogout={handleLogout}
         onNavigate={(page) => setActivePage(page)}
         activePage={activePage}
-        onQuickSwitchRole={handleQuickSwitchRole}
       />
 
       <main style={{ flex: 1, padding: '1.5rem 0' }}>

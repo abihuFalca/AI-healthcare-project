@@ -105,7 +105,7 @@ export default function AssessmentResultView({ result, onBack, onNewAssessment }
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>
-                Clinical Assessment ID #{result.assessment_id || 'DEMO-101'} · {new Date(result.created_at || Date.now()).toLocaleTimeString()}
+                Clinical Assessment ID #{result.assessment_id || result.id || 'N/A'} · {new Date(result.created_at || Date.now()).toLocaleTimeString()}
               </span>
               <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', marginTop: '0.2rem' }}>
                 {result.headline || "AI identified an elevated risk pattern based on the information provided."}

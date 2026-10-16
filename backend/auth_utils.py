@@ -88,10 +88,18 @@ def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Secur
         cursor.execute("SELECT id, full_name, date_of_birth, gender, height, weight, preferred_language, consent_accepted FROM patient_profiles WHERE user_id = %s", (user_id,))
         p_row = cursor.fetchone()
         user["profile"] = dict(p_row) if p_row else None
+        user["patient_profile"] = user["profile"]
+        user["doctor_profile"] = None
     elif user["role"] == "HEALTHCARE_WORKER":
         cursor.execute("SELECT id, full_name, professional_role, professional_id, hospital_name, department, verification_status FROM healthcare_workers WHERE user_id = %s", (user_id,))
         w_row = cursor.fetchone()
         user["doctor_profile"] = dict(w_row) if w_row else None
+        user["profile"] = user["doctor_profile"]
+        user["patient_profile"] = None
+    else:
+        user["profile"] = None
+        user["doctor_profile"] = None
+        user["patient_profile"] = None
 
     conn.close()
     return user

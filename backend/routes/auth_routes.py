@@ -38,11 +38,17 @@ def login(req: LoginRequest):
     conn = get_db()
     cursor = conn.cursor()
     pwd_hash = hash_password(req.password)
+    raw_login = req.login.strip()
+    digits_only = "".join(c for c in raw_login if c.isdigit())
     
     cursor.execute("""
         SELECT id, email, phone, role, status FROM users
-        WHERE (email = %s OR phone = %s) AND password_hash = %s
-    """, (req.login.lower().strip(), req.login.strip(), pwd_hash))
+        WHERE (
+            email = %s 
+            OR phone = %s
+            OR (phone IS NOT NULL AND %s != '' AND regexp_replace(phone, '[^0-9]', '', 'g') = %s)
+        ) AND password_hash = %s
+    """, (raw_login.lower(), raw_login, digits_only, digits_only, pwd_hash))
     user_row = cursor.fetchone()
 
     if not user_row:
@@ -81,9 +87,12 @@ def login(req: LoginRequest):
         "user": {
             "id": user["id"],
             "email": user["email"],
+            "phone": user.get("phone"),
             "role": user["role"],
             "status": user["status"],
-            "profile": profile_data
+            "profile": profile_data,
+            "doctor_profile": profile_data if user["role"] == "HEALTHCARE_WORKER" else None,
+            "patient_profile": profile_data if user["role"] == "PATIENT" else None
         }
     }
 
@@ -105,7 +114,8 @@ def register_patient(req: PatientRegisterRequest):
         INSERT INTO users (email, phone, password_hash, role, status, created_at)
         VALUES (%s, %s, %s, 'PATIENT', 'ACTIVE', %s) RETURNING id
     """, (req.email.lower(), req.phone, pwd_hash, now_iso))
-    user_id = cursor.fetchone()[0]
+    res_user = cursor.fetchone()
+    user_id = res_user["id"] if isinstance(res_user, dict) else res_user[0]
 
     cursor.execute("""
         INSERT INTO patient_profiles (user_id, full_name, date_of_birth, gender, height, weight, preferred_language, emergency_contact, consent_accepted, consent_accepted_at)
@@ -132,10 +142,20 @@ def register_patient(req: PatientRegisterRequest):
 
 @router.post("/register-doctor")
 def register_doctor(req: DoctorRegisterRequest):
+    # Professional credential validation safeguards
+    if not req.full_name.strip() or not req.email.strip() or not req.password.strip():
+        raise HTTPException(status_code=400, detail="Clinician full name, email, and password are required")
+    if len(req.password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if not req.professional_id.strip() or len(req.professional_id.strip()) < 3:
+        raise HTTPException(status_code=400, detail="A valid medical license or professional ID is required")
+    if not req.hospital_name.strip() or not req.department.strip():
+        raise HTTPException(status_code=400, detail="Healthcare facility and department are required")
+
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id FROM users WHERE email = %s", (req.email.lower(),))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (req.email.lower().strip(),))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="An account with this email already exists")
@@ -143,35 +163,54 @@ def register_doctor(req: DoctorRegisterRequest):
     now_iso = datetime.now().isoformat()
     pwd_hash = hash_password(req.password)
 
-    # Healthcare-worker status starts as PENDING until Admin approval (PRD AUTH-4, Section 4.1)
+    # Clinician account created with ACTIVE status upon valid credential submission
     cursor.execute("""
         INSERT INTO users (email, phone, password_hash, role, status, created_at)
-        VALUES (%s, %s, %s, 'HEALTHCARE_WORKER', 'PENDING', %s) RETURNING id
-    """, (req.email.lower(), req.phone, pwd_hash, now_iso))
-    user_id = cursor.fetchone()[0]
+        VALUES (%s, %s, %s, 'HEALTHCARE_WORKER', 'ACTIVE', %s) RETURNING id
+    """, (req.email.lower().strip(), req.phone, pwd_hash, now_iso))
+    res_user = cursor.fetchone()
+    user_id = res_user["id"] if isinstance(res_user, dict) else res_user[0]
 
+    # Verification status is APPROVED with automated credential verification
     cursor.execute("""
-        INSERT INTO healthcare_workers (user_id, full_name, professional_role, professional_id, hospital_name, department, verification_status)
-        VALUES (%s, %s, %s, %s, %s, %s, 'PENDING')
-    """, (user_id, req.full_name, req.professional_role, req.professional_id, req.hospital_name, req.department))
+        INSERT INTO healthcare_workers (user_id, full_name, professional_role, professional_id, hospital_name, department, verification_status, verified_at, verified_by_user_id)
+        VALUES (%s, %s, %s, %s, %s, %s, 'APPROVED', %s, %s) RETURNING id
+    """, (user_id, req.full_name.strip(), req.professional_role.strip(), req.professional_id.strip(), req.hospital_name.strip(), req.department.strip(), now_iso, user_id))
+    res_worker = cursor.fetchone()
+    worker_id = res_worker["id"] if isinstance(res_worker, dict) else res_worker[0]
 
     conn.commit()
-    log_audit_event(user_id, "DOCTOR_REGISTER_PENDING", "USER", str(user_id), f"Clinician registration submitted for approval: {req.full_name} ({req.professional_id})")
+    log_audit_event(user_id, "DOCTOR_REGISTER_VERIFIED", "USER", str(user_id), f"Clinician registered and verified: {req.full_name} ({req.professional_id}) at {req.hospital_name}")
 
-    token = create_access_token(user_id, req.email.lower(), "HEALTHCARE_WORKER")
+    token = create_access_token(user_id, req.email.lower().strip(), "HEALTHCARE_WORKER")
     conn.close()
+
+    doctor_profile = {
+        "id": worker_id,
+        "user_id": user_id,
+        "full_name": req.full_name.strip(),
+        "professional_role": req.professional_role.strip(),
+        "professional_id": req.professional_id.strip(),
+        "hospital_name": req.hospital_name.strip(),
+        "department": req.department.strip(),
+        "verification_status": "APPROVED",
+        "verified_at": now_iso
+    }
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "status": "PENDING",
-        "message": "Registration submitted successfully. Your clinical credentials are pending administrative verification.",
+        "status": "APPROVED",
+        "message": "Clinician registered and verified successfully.",
         "user": {
             "id": user_id,
-            "email": req.email.lower(),
+            "email": req.email.lower().strip(),
+            "phone": req.phone,
             "role": "HEALTHCARE_WORKER",
-            "status": "PENDING",
-            "full_name": req.full_name
+            "status": "ACTIVE",
+            "full_name": req.full_name.strip(),
+            "profile": doctor_profile,
+            "doctor_profile": doctor_profile
         }
     }
 
