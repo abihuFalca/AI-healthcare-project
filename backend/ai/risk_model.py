@@ -10,6 +10,7 @@ Configurable bands:
 """
 
 import math
+import re
 from typing import Dict, Any, List, Tuple
 
 MODEL_VERSION = "rf-0.1.0"
@@ -21,6 +22,29 @@ def calculate_bmi(height_cm: float, weight_kg: float) -> float:
     height_m = height_cm / 100.0
     return round(weight_kg / (height_m * height_m), 1)
 
+SURGERY_REGEX = re.compile(
+    r"\b(surgery|surgeries|surgical|operation|operated|laparoscop\w*|post[- ]?op\w*|"
+    r"appendectomy|appendicectomy|cholecystectomy|hernia repair|c[- ]?section|caesarean|cesarean)\b",
+    re.IGNORECASE,
+)
+_SURGERY_NEGATION = re.compile(r"\b(no|never|not had|without)\s+(\w+\s+){0,3}$", re.IGNORECASE)
+
+def mentions_surgery(text: str) -> bool:
+    """True if free text mentions an operation that is not negated ("no surgery")."""
+    for m in SURGERY_REGEX.finditer(text or ""):
+        if not _SURGERY_NEGATION.search(text[max(0, m.start() - 30):m.start()]):
+            return True
+    return False
+
+def parse_duration_hours(duration: str):
+    """'5 hours' -> 5, '2 days' -> 48, '30 minutes' -> 0.5; None if unknown."""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(minute|min|hour|hr|day|week|month)", (duration or "").lower())
+    if not m:
+        return None
+    n = float(m.group(1))
+    unit = m.group(2)
+    return n * {"minute": 1 / 60, "min": 1 / 60, "hour": 1, "hr": 1, "day": 24, "week": 168, "month": 720}[unit]
+
 def compute_risk_features(
     age: int,
     gender: str,
@@ -30,7 +54,10 @@ def compute_risk_features(
     vitals: Dict[str, Any],
     history: List[str],
     risk_factors: List[str],
-    medications: List[str]
+    medications: List[str],
+    severity: str = "Unknown",
+    duration: str = "Unknown",
+    raw_text: str = ""
 ) -> Dict[str, float]:
     """
     Constructs normalized clinical risk weight vector.
@@ -81,6 +108,45 @@ def compute_risk_features(
         features["symptom_headache"] = 0.20
     if "cough" in symp_set:
         features["symptom_cough"] = 0.15
+    if "abdominal pain" in symp_set:
+        features["symptom_abdominal_pain"] = 0.45
+    if "vomiting" in symp_set:
+        features["symptom_vomiting"] = 0.35
+    elif "nausea" in symp_set:
+        features["symptom_nausea"] = 0.15
+    if "diarrhoea" in symp_set:
+        features["symptom_diarrhoea"] = 0.20
+    if "numbness" in symp_set:
+        features["symptom_numbness"] = 0.45
+    if "excessive thirst" in symp_set:
+        features["symptom_excessive_thirst"] = 0.25
+    if "fatigue" in symp_set:
+        features["symptom_fatigue"] = 0.10
+
+    # Stated severity and duration of the presenting symptoms
+    sev = (severity or "Unknown").strip().lower()
+    if sev == "severe":
+        features["severity_severe"] = 0.45
+    elif sev == "moderate":
+        features["severity_moderate"] = 0.20
+    duration_hours = parse_duration_hours(duration)
+
+    # Recent surgery (from history or mentioned in the symptom text)
+    hist_text = " ".join(history or []).lower()
+    recent_surgery = bool(SURGERY_REGEX.search(hist_text)) or mentions_surgery(raw_text)
+    if recent_surgery:
+        features["history_recent_surgery"] = 0.40
+
+    # Clinically meaningful combinations
+    if "abdominal pain" in symp_set:
+        if recent_surgery:
+            features["postoperative_abdominal_pain"] = 0.55
+        if "vomiting" in symp_set or "nausea" in symp_set:
+            features["abdominal_pain_with_vomiting"] = 0.30 if "vomiting" in symp_set else 0.15
+        if sev == "severe":
+            features["severe_abdominal_pain"] = 0.35
+        if sev == "severe" and duration_hours is not None and duration_hours >= 6:
+            features["persistent_severe_abdominal_pain"] = 0.30
 
     # 3. Vitals Deviations
     sbp = vitals.get("systolic_bp")
@@ -174,14 +240,18 @@ def predict_patient_risk(
     history: List[str],
     risk_factors: List[str],
     medications: List[str],
-    safety_rule_triggered: bool = False
+    safety_rule_triggered: bool = False,
+    severity: str = "Unknown",
+    duration: str = "Unknown",
+    raw_text: str = ""
 ) -> Tuple[float, int, str, str, Dict[str, float]]:
     """
     Computes calibrated probability, risk score (0-100), risk level (LOW/MODERATE/HIGH),
     and triage priority (ROUTINE/PROMPT/IMMEDIATE/EMERGENCY).
     """
     features = compute_risk_features(
-        age, gender, height, weight, symptoms, vitals, history, risk_factors, medications
+        age, gender, height, weight, symptoms, vitals, history, risk_factors, medications,
+        severity=severity, duration=duration, raw_text=raw_text
     )
 
     # Base log-odds (calibrated baseline for general population)
@@ -194,6 +264,11 @@ def predict_patient_risk(
     # Map to 0-100 risk score
     score = int(round(prob * 100))
     score = max(5, min(98, score))  # Keep within reasonable display bounds
+
+    # Deterministic escalation: severe abdominal pain after recent surgery can be a
+    # post-operative complication and must be seen the same day (HIGH / IMMEDIATE).
+    if "postoperative_abdominal_pain" in features and "severity_severe" in features:
+        score = max(score, 72)
 
     # Rule hit forces high risk
     if safety_rule_triggered:

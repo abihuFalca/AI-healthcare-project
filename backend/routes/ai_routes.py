@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from auth_utils import get_current_user, require_role, log_audit_event
-from ai.nlp import parse_free_text_symptoms
+from ai.nlp import parse_free_text_symptoms, CANONICAL_SYMPTOMS
 from ai.risk_model import predict_patient_risk
 from ai.safety_rules import evaluate_safety_rules
 from ai.explainability import generate_shap_explanations
@@ -43,6 +43,14 @@ def analyze_symptoms_nlp(req: SymptomAnalysisRequest, user: dict = Depends(get_c
     -> symptoms = [chest discomfort, dizziness, sweating]; duration = 3 hours; severity = Unknown
     """
     result = parse_free_text_symptoms(req.text)
+
+    # LLM reader catches wording the rules miss; it can only add canonical symptoms
+    llm_symptoms = get_llm_service().extract_symptoms(req.text, list(CANONICAL_SYMPTOMS.keys()))
+    result["ai_extracted_symptoms"] = [
+        s for s in llm_symptoms
+        if s not in result["extracted_symptoms"] and s not in result["negated_symptoms"]
+    ]
+    result["extracted_symptoms"] = result["extracted_symptoms"] + result["ai_extracted_symptoms"]
     return result
 
 @router.post("/predict-risk")

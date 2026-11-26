@@ -21,8 +21,8 @@ export default function AssessmentWizard({ onComplete, onCancel, token }) {
     symptomText: '',
     selectedSymptoms: [],
     extractedSymptoms: [],
-    duration: '3 hours',
-    severity: 'Moderate',
+    duration: '',
+    severity: 'Unknown',
     // Step 3: Medical History
     medicalHistory: ['Hypertension'],
     // Step 4: Medications
@@ -57,7 +57,8 @@ export default function AssessmentWizard({ onComplete, onCancel, token }) {
 
   const historyOptions = [
     'Hypertension', 'Diabetes', 'Heart Disease / CAD', 'Asthma',
-    'Kidney Disease', 'Previous Stroke / TIA', 'Cancer History'
+    'Kidney Disease', 'Previous Stroke / TIA', 'Cancer History',
+    'Recent Surgery (last 30 days)'
   ];
 
   const riskOptions = [
@@ -460,7 +461,7 @@ export default function AssessmentWizard({ onComplete, onCancel, token }) {
                   <option value="Mild">Mild</option>
                   <option value="Moderate">Moderate</option>
                   <option value="Severe">Severe</option>
-                  <option value="Unknown">Unknown</option>
+                  <option value="Unknown">Not sure</option>
                 </select>
               </div>
             </div>

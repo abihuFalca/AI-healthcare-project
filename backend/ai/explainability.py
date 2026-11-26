@@ -11,6 +11,76 @@ Transforms feature weights into human-understandable clinical contributions:
 from typing import Dict, Any, List
 
 FEATURE_DESCRIPTIONS = {
+    "symptom_abdominal_pain": (
+        "Abdominal Pain",
+        "Abdominal pain can signal inflammation, obstruction or infection in the abdomen and needs clinical assessment.",
+        "high"
+    ),
+    "symptom_vomiting": (
+        "Vomiting",
+        "Vomiting raises the risk of dehydration and, with abdominal pain, can point to an acute abdominal problem.",
+        "medium"
+    ),
+    "symptom_nausea": (
+        "Nausea",
+        "A feeling of needing to vomit often accompanies abdominal and systemic illness.",
+        "low"
+    ),
+    "symptom_diarrhoea": (
+        "Diarrhoea",
+        "Diarrhoea can cause fluid and electrolyte loss.",
+        "low"
+    ),
+    "symptom_numbness": (
+        "Numbness / Tingling",
+        "New numbness or tingling can reflect a nerve or circulation problem.",
+        "medium"
+    ),
+    "symptom_excessive_thirst": (
+        "Excessive Thirst",
+        "Excessive thirst can be a sign of high blood sugar or dehydration.",
+        "low"
+    ),
+    "symptom_fatigue": (
+        "Fatigue",
+        "Unusual tiredness is a non-specific sign that adds context to other findings.",
+        "low"
+    ),
+    "severity_severe": (
+        "Severe Symptoms Reported",
+        "The patient describes their symptoms as severe, which increases clinical urgency.",
+        "high"
+    ),
+    "severity_moderate": (
+        "Moderate Symptoms Reported",
+        "The patient describes their symptoms as moderate.",
+        "medium"
+    ),
+    "history_recent_surgery": (
+        "Recent Surgery",
+        "A recent operation (including laparoscopic surgery) raises the chance of complications such as infection, bleeding or leakage.",
+        "high"
+    ),
+    "postoperative_abdominal_pain": (
+        "Abdominal Pain After Surgery",
+        "Abdominal pain after a recent operation can be a sign of a post-operative complication and should be reviewed the same day.",
+        "high"
+    ),
+    "abdominal_pain_with_vomiting": (
+        "Abdominal Pain With Nausea / Vomiting",
+        "Abdominal pain together with nausea or vomiting is a pattern clinicians prioritise for review.",
+        "medium"
+    ),
+    "severe_abdominal_pain": (
+        "Severe Abdominal Pain",
+        "Severe abdominal pain is a red-flag symptom that clinicians aim to assess promptly.",
+        "high"
+    ),
+    "persistent_severe_abdominal_pain": (
+        "Severe Abdominal Pain Lasting 6+ Hours",
+        "Severe abdominal pain lasting six hours or more is a recognised warning sign that needs prompt assessment.",
+        "high"
+    ),
     "symptom_chest_discomfort": (
         "Chest Discomfort",
         "Acute chest discomfort or pain is a primary clinical warning sign for acute cardiac ischemia.",

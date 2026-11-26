@@ -141,8 +141,15 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
         (req.selected_symptoms or []) + nlp_result["extracted_symptoms"] + llm_only_symptoms
     ))
     
-    duration = req.duration if req.duration and req.duration != "Unknown" else nlp_result["duration"]
-    severity = req.severity if req.severity and req.severity != "Unknown" else nlp_result["severity"]
+    # What the patient wrote wins over a form default: use the duration stated in
+    # the text when there is one, and the more severe of the two severity values.
+    form_duration = (req.duration or "").strip()
+    duration = nlp_result["duration"] if nlp_result["duration"] != "Unknown" else (form_duration or "Unknown")
+    severity_rank = {"unknown": 0, "mild": 1, "moderate": 2, "severe": 3}
+    severity = max(
+        [req.severity or "Unknown", nlp_result["severity"] or "Unknown"],
+        key=lambda s: severity_rank.get(s.strip().lower(), 0),
+    )
 
     vitals_dict = req.vitals.dict()
 
@@ -165,7 +172,10 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
         history=req.medical_history,
         risk_factors=req.risk_factors,
         medications=req.medications,
-        safety_rule_triggered=is_emergency
+        safety_rule_triggered=is_emergency,
+        severity=severity,
+        duration=duration,
+        raw_text=req.symptom_text or ""
     )
 
     # 5. Explainable AI (SHAP-compatible factor attribution)
