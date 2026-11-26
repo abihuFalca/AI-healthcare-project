@@ -14,7 +14,12 @@ from dotenv import load_dotenv
 from database import get_db
 
 load_dotenv()
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "med_triage_super_secure_clinical_jwt_secret_key_2026")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY or "REPLACE" in SECRET_KEY.upper():
+    raise RuntimeError(
+        "JWT_SECRET_KEY is not set. Add a long random value to .env "
+        "(see .env.example) before starting the backend."
+    )
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
