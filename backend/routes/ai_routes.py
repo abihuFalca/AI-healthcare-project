@@ -116,7 +116,7 @@ def explain_assessment_result(req: ExplainResultRequest, user: dict = Depends(ge
     if not llm.available:
         raise HTTPException(
             status_code=503,
-            detail="LLM service not available. Set OPENAI_API_KEY environment variable."
+            detail=f"LLM service not available. Set {llm.key_env} in .env."
         )
     
     try:
@@ -219,7 +219,7 @@ def _case_facts(asm: Dict[str, Any]) -> Dict[str, Any]:
 def _require_llm():
     llm = get_llm_service()
     if not llm.available:
-        raise HTTPException(status_code=503, detail="AI features are not available right now (OPENAI_API_KEY not configured).")
+        raise HTTPException(status_code=503, detail=f"AI features are not available right now ({llm.key_env} not configured in .env).")
     return llm
 
 

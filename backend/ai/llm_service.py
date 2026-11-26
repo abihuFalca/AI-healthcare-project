@@ -22,37 +22,67 @@ except ImportError:
     print("Warning: OpenAI not installed. Install with: pip install openai")
 
 
+# Providers that speak the OpenAI chat-completions API.
+# Gemini and Groq both have free tiers; pick one with LLM_PROVIDER in .env.
+PROVIDERS = {
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "key_env": "GEMINI_API_KEY",
+        "default_model": "gemini-2.5-flash",
+    },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "key_env": "GROQ_API_KEY",
+        "default_model": "llama-3.3-70b-versatile",
+    },
+    "openai": {
+        "base_url": None,
+        "key_env": "OPENAI_API_KEY",
+        "default_model": "gpt-4o-mini",
+    },
+}
+
+
 class LLMService:
     """
-    Wrapper around OpenAI API for healthcare-specific text generation.
-    Includes simple in-memory caching to reduce API calls.
+    Wrapper around an OpenAI-compatible chat API (Gemini, Groq or OpenAI)
+    for healthcare-specific text generation, with simple in-memory caching.
     """
-    
+
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """
         Initialize LLM service.
-        
-        Args:
-            api_key: OpenAI API key (default: read from OPENAI_API_KEY env var)
-            model: Model to use (default: gpt-4-turbo, fallback: gpt-3.5-turbo)
+
+        Reads from .env:
+            LLM_PROVIDER  gemini | groq | openai (default: openai)
+            <PROVIDER>_API_KEY  e.g. GEMINI_API_KEY
+            LLM_MODEL     optional model override
         """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+        self.provider = (os.getenv("LLM_PROVIDER") or "openai").strip().lower()
+        if self.provider not in PROVIDERS:
+            print(f"Unknown LLM_PROVIDER '{self.provider}', falling back to openai.")
+            self.provider = "openai"
+        cfg = PROVIDERS[self.provider]
+        self.key_env = cfg["key_env"]
+
+        self.api_key = api_key or os.getenv(cfg["key_env"])
+        legacy_model = os.getenv("OPENAI_MODEL") if self.provider == "openai" else None
+        self.model = model or os.getenv("LLM_MODEL") or legacy_model or cfg["default_model"]
         self.cache = {}  # Simple in-memory cache {hash(prompt): response}
         self.cache_ttl = 86400  # 24 hours
-        
+
         # Treat template values such as "sk-REPLACE_WITH_YOUR_KEY" as not configured
         if self.api_key and any(m in self.api_key.upper() for m in ("REPLACE", "YOUR_", "CHANGEME")):
-            print("OPENAI_API_KEY looks like a placeholder; AI features are disabled until a real key is set.")
+            print(f"{cfg['key_env']} looks like a placeholder; AI features are disabled until a real key is set.")
             self.api_key = None
 
         if self.api_key and OPENAI_AVAILABLE:
-            self.client = OpenAI(api_key=self.api_key)
+            self.client = OpenAI(api_key=self.api_key, base_url=cfg["base_url"])
             self.available = True
         else:
             self.client = None
             self.available = False
-            print("LLM service not available. Set OPENAI_API_KEY environment variable.")
+            print(f"LLM service not available. Set {cfg['key_env']} in .env (LLM_PROVIDER={self.provider}).")
     
     def _cache_key(self, prompt: str) -> str:
         """Generate cache key from prompt."""
@@ -367,6 +397,7 @@ Plain-language explanation:
         """Check if LLM service is operational."""
         return {
             "available": self.available,
+            "provider": self.provider,
             "model": self.model,
             "cache_size": len(self.cache),
             "openai_available": OPENAI_AVAILABLE
