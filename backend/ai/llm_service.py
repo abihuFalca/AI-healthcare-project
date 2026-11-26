@@ -28,12 +28,14 @@ PROVIDERS = {
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "key_env": "GEMINI_API_KEY",
-        "default_model": "gemini-2.5-flash",
+        "default_model": "gemini-flash-lite-latest",
+        "fallback_models": ["gemini-flash-latest"],
     },
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
         "key_env": "GROQ_API_KEY",
         "default_model": "llama-3.3-70b-versatile",
+        "fallback_models": ["llama-3.1-8b-instant"],
     },
     "openai": {
         "base_url": None,
@@ -64,6 +66,7 @@ class LLMService:
             self.provider = "openai"
         cfg = PROVIDERS[self.provider]
         self.key_env = cfg["key_env"]
+        self.fallback_models = cfg.get("fallback_models", [])
 
         self.api_key = api_key or os.getenv(cfg["key_env"])
         legacy_model = os.getenv("OPENAI_MODEL") if self.provider == "openai" else None
@@ -77,7 +80,7 @@ class LLMService:
             self.api_key = None
 
         if self.api_key and OPENAI_AVAILABLE:
-            self.client = OpenAI(api_key=self.api_key, base_url=cfg["base_url"])
+            self.client = OpenAI(api_key=self.api_key, base_url=cfg["base_url"], max_retries=1)
             self.available = True
         else:
             self.client = None
@@ -132,14 +135,7 @@ Original notice:
 
 Plain language version:
 """
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=600,
-                temperature=0.3
-            )
-            
-            result = response.choices[0].message.content.strip()
+            result = self._chat([{"role": "user", "content": prompt}], max_tokens=600, temperature=0.3)
             self._set_cached(f"paraphrase:{notice[:100]}", result)
             return result
             
@@ -214,14 +210,7 @@ Instructions:
 
 Plain-language explanation:
 """
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=200,
-                temperature=0.4
-            )
-            
-            result = response.choices[0].message.content.strip()
+            result = self._chat([{"role": "user", "content": prompt}], max_tokens=400, temperature=0.4)
             self._set_cached(cache_key, result)
             return result
             
@@ -265,18 +254,34 @@ Plain-language explanation:
     # ------------------------------------------------------------------
     def _chat(self, messages: List[Dict[str, str]], max_tokens: int = 400,
               temperature: float = 0.2, json_mode: bool = False) -> str:
-        """Single chat completion call with a short timeout. Raises on failure."""
+        """
+        Chat completion with a short timeout. If the model is busy, rate-limited
+        or retired, tries the provider's fallback models. Raises if all fail.
+        """
         kwargs = {
-            "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
-            "timeout": 20,
+            "timeout": 25,
         }
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
-        response = self.client.chat.completions.create(**kwargs)
-        return (response.choices[0].message.content or "").strip()
+
+        last_error = None
+        for model in [self.model] + [m for m in self.fallback_models if m != self.model]:
+            try:
+                response = self.client.chat.completions.create(model=model, **kwargs)
+                content = (response.choices[0].message.content or "").strip()
+                if content:
+                    return content
+                last_error = RuntimeError(f"{model} returned an empty reply")
+            except Exception as e:
+                status = getattr(e, "status_code", None)
+                if status not in (404, 429, 500, 503) and type(e).__name__ not in ("APITimeoutError", "APIConnectionError"):
+                    raise
+                last_error = e
+            print(f"LLM model {model} unavailable ({last_error}); trying next model")
+        raise last_error
 
     # ------------------------------------------------------------------
     # 1. Smarter symptom reading (assists the rule-based NLP; never replaces it)
