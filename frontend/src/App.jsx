@@ -56,6 +56,16 @@ export default function App() {
     localStorage.removeItem('med_user');
   };
 
+  // On load, make sure a saved login is still valid (tokens expire after 24h,
+  // or when the server's secret changes). If not, return to the sign-in page.
+  useEffect(() => {
+    if (!token) return;
+    fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
+      .then((res) => { if (res.status === 401) handleLogout(); })
+      .catch(() => { /* offline: keep the session and let later calls report errors */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleRefreshProfile = async () => {
     try {
       const res = await fetch('/api/auth/me', {

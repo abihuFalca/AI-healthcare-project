@@ -72,7 +72,8 @@ if dist_dir.exists():
         file_path = dist_dir / full_path
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
-        return FileResponse(dist_dir / "index.html")
+        # index.html must not be cached, or browsers keep loading an old build
+        return FileResponse(dist_dir / "index.html", headers={"Cache-Control": "no-cache"})
 
 if __name__ == "__main__":
     import uvicorn
