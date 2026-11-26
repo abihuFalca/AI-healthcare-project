@@ -17,3 +17,8 @@ venv/
 
 # Local Database
 backend/healthcare.db
+
+# Local scratch / runtime files
+fastapi_pid.txt
+prd_content.txt
+extract_prd.py

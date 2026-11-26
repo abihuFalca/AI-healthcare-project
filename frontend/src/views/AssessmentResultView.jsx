@@ -6,6 +6,7 @@ import {
 import RiskBadge from '../components/RiskBadge';
 import RiskScoreGauge from '../components/RiskScoreGauge';
 import ExplainabilityCard from '../components/ExplainabilityCard';
+import AssessmentExplanation from '../components/AssessmentExplanation';
 
 export default function AssessmentResultView({ result, onBack, onNewAssessment }) {
   if (!result) return null;
@@ -197,6 +198,17 @@ export default function AssessmentResultView({ result, onBack, onNewAssessment }
             vitals: result.vitals || result.vitals_snapshot
           }}
           review={result.review}
+        />
+
+        {/* LLM-Generated Plain Language Explanation (Phase 3 Track A) */}
+        <AssessmentExplanation
+          riskScore={result.risk_score}
+          riskLevel={result.risk_level}
+          triageLevel={result.triage_level}
+          shapFeatures={result.factors}
+          age={result.age}
+          symptoms={result.combined_symptoms || result.symptoms_json}
+          token={localStorage.getItem('med_token')}
         />
 
         {/* Mandatory Clinical Disclaimer (PRD Section 6.7 & Appendix B) */}

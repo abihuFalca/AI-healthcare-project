@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import LoginView from './views/LoginView';
 import PatientDashboard from './views/PatientDashboard';
-import AssessmentWizard from './views/AssessmentWizard';
+import AssessmentWizardWrapper from './views/AssessmentWizardWrapper';
 import AssessmentResultView from './views/AssessmentResultView';
 import DoctorDashboard from './views/DoctorDashboard';
 import DoctorQueue from './views/DoctorQueue';
@@ -146,7 +146,7 @@ export default function App() {
             )}
 
             {activePage === 'assessment' && (
-              <AssessmentWizard
+              <AssessmentWizardWrapper
                 token={token}
                 onComplete={handleAssessmentComplete}
                 onCancel={() => setActivePage('dashboard')}

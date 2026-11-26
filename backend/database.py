@@ -215,6 +215,22 @@ def init_db():
     );
     """)
 
+    # Consent records (Section 9.2, PRD §11.2)
+    # Immutable audit trail of user consent for AI processing and data usage
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS consent_records (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        consent_version TEXT NOT NULL,
+        accepted BOOLEAN NOT NULL DEFAULT TRUE,
+        accepted_at TIMESTAMP NOT NULL,
+        ip_address TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
+    # Older databases created the table without the accepted flag
+    cursor.execute("ALTER TABLE consent_records ADD COLUMN IF NOT EXISTS accepted BOOLEAN NOT NULL DEFAULT TRUE;")
+
     # System configuration & model information (Section 6.10, ADM-6, ADM-7)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS system_settings (

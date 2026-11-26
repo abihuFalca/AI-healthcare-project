@@ -2,6 +2,8 @@
 """Test PostgreSQL connection and data flow."""
 
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import json
 from database import get_db, hash_password
 

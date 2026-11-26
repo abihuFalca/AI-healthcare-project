@@ -222,3 +222,124 @@ def get_me(user: dict = Depends(get_current_user)):
 def logout(user: dict = Depends(get_current_user)):
     log_audit_event(user["id"], "USER_LOGOUT", "USER", str(user["id"]), "User logged out")
     return {"message": "Logged out successfully"}
+
+# ============================================================================
+# CONSENT MANAGEMENT (PRD §9.2, §6.3)
+# ============================================================================
+
+class ConsentRequest(BaseModel):
+    consent_version: str  # e.g., "v1.0"
+    accepted: bool        # True to accept AI processing, False to decline
+
+@router.post("/consent")
+def record_consent(req: ConsentRequest, user: dict = Depends(get_current_user)):
+    """
+    Records explicit consent for AI-based health assessment and data processing.
+    
+    PRD Requirements:
+    - Explicit consent required before first assessment (§9.2, §6.3)
+    - Stores consent version, timestamp, and acceptance status for audit trail
+    - If declined, user can still submit assessments but AI processing is skipped
+    - Consent is per-user, stored in consent_records table
+    
+    Args:
+        req: ConsentRequest with consent_version and accepted boolean
+        user: Current authenticated user
+        
+    Returns:
+        Consent record with id, timestamp, and status
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    now_iso = datetime.now().isoformat()
+    
+    # Skip a duplicate only when the latest decision for this version is the same.
+    # A user who declined earlier and now accepts (or withdraws) must get a new row.
+    cursor.execute("""
+        SELECT id, accepted, accepted_at FROM consent_records
+        WHERE user_id = %s AND consent_version = %s
+        ORDER BY id DESC LIMIT 1
+    """, (user["id"], req.consent_version))
+    existing = cursor.fetchone()
+
+    if existing and bool(existing["accepted"]) == req.accepted:
+        conn.close()
+        return {
+            "message": f"Consent for version {req.consent_version} already recorded",
+            "consent_id": existing["id"],
+            "accepted": req.accepted,
+            "consent_version": req.consent_version,
+            "accepted_at": existing["accepted_at"]
+        }
+
+    # Append a new consent record (accepted or declined) — the table is append-only
+    cursor.execute("""
+        INSERT INTO consent_records (user_id, consent_version, accepted, accepted_at)
+        VALUES (%s, %s, %s, %s) RETURNING id
+    """, (user["id"], req.consent_version, req.accepted, now_iso))
+
+    consent_id = cursor.fetchone()["id"]
+
+    # Keep the patient profile flag in sync with the latest decision
+    if user["role"] == "PATIENT":
+        cursor.execute("""
+            UPDATE patient_profiles
+            SET consent_accepted = %s, consent_accepted_at = %s
+            WHERE user_id = %s
+        """, (req.accepted, now_iso if req.accepted else None, user["id"]))
+    
+    conn.commit()
+    
+    # Audit logging
+    action = "CONSENT_ACCEPTED" if req.accepted else "CONSENT_DECLINED"
+    log_audit_event(
+        user["id"],
+        action,
+        "CONSENT",
+        str(consent_id),
+        f"User consent recorded for version {req.consent_version}: {'ACCEPTED' if req.accepted else 'DECLINED'}"
+    )
+    
+    conn.close()
+    
+    return {
+        "consent_id": consent_id,
+        "accepted": req.accepted,
+        "consent_version": req.consent_version,
+        "accepted_at": now_iso,
+        "message": f"Consent {'accepted' if req.accepted else 'declined'} and recorded for audit compliance"
+    }
+
+@router.get("/consent/status")
+def get_consent_status(user: dict = Depends(get_current_user)):
+    """
+    Returns current consent status for the authenticated user.
+    
+    Returns the most recent consent record with version and acceptance status.
+    Used by frontend to determine whether to show ConsentScreen.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT id, consent_version, accepted, accepted_at FROM consent_records
+        WHERE user_id = %s
+        ORDER BY id DESC LIMIT 1
+    """, (user["id"],))
+
+    consent_row = cursor.fetchone()
+    conn.close()
+
+    if not consent_row:
+        return {
+            "has_consented": False,
+            "message": "No consent record found; user must review privacy notice"
+        }
+
+    # The latest decision wins: a decline (or withdrawal) means no consent
+    return {
+        "has_consented": bool(consent_row["accepted"]),
+        "consent_id": consent_row["id"],
+        "consent_version": consent_row["consent_version"],
+        "accepted_at": consent_row["accepted_at"]
+    }

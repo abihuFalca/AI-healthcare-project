@@ -91,7 +91,36 @@ def validate_vitals_limits(v: VitalsInput) -> List[str]:
 def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require_role(["PATIENT"]))):
     """
     Submits patient assessment through the complete AI triage pipeline (PRD Section 6.3 & 6.4).
+    
+    IMPORTANT: Consent enforcement (PRD §9.2)
+    - Checks if user has accepted consent before processing any health data
+    - If consent not found, returns 403 error requiring user to accept privacy notice first
     """
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # ========================================================================
+    # CONSENT CHECK (PRD §9.2) - BEFORE ANY DATA PROCESSING
+    # ========================================================================
+    cursor.execute("""
+        SELECT id, accepted FROM consent_records
+        WHERE user_id = %s
+        ORDER BY id DESC LIMIT 1
+    """, (user["id"],))
+    consent_row = cursor.fetchone()
+
+    # The latest decision must be an acceptance; a decline or withdrawal blocks processing
+    if not consent_row or not consent_row["accepted"]:
+        conn.close()
+        raise HTTPException(
+            status_code=403,
+            detail="Consent required: You must review and accept the privacy notice before submitting an assessment. "
+                   "Please complete the consent screen and try again."
+        )
+    
+    # ========================================================================
+    # ASSESSMENT PROCESSING CONTINUES (only if consent exists)
+    # ========================================================================
     # 1. Range validation
     warnings = validate_vitals_limits(req.vitals)
 
@@ -134,9 +163,8 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
     final_recommendation = emergency_recommendation if is_emergency else rec_info["recommendation_text"]
 
     # 7. Persistence in PostgreSQL DB
-    conn = get_db()
-    cursor = conn.cursor()
-
+    # (conn and cursor already opened above for consent check, reuse them)
+    
     cursor.execute("SELECT id, full_name FROM patient_profiles WHERE user_id = %s", (user["id"],))
     pat_profile = cursor.fetchone()
     patient_id = pat_profile["id"]

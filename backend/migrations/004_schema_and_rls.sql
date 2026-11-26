@@ -245,11 +245,12 @@ CREATE TABLE IF NOT EXISTS consent_records (
     user_id          BIGINT    NOT NULL
                                REFERENCES users (id) ON DELETE CASCADE,
     consent_version  TEXT      NOT NULL DEFAULT 'v1.0',
+    accepted         BOOLEAN   NOT NULL DEFAULT TRUE,
     accepted_at      TEXT      NOT NULL,
     ip_address       TEXT
 );
 
-COMMENT ON TABLE consent_records IS 'Immutable consent audit trail. One row per consent acceptance event. PRD §9.2.';
+COMMENT ON TABLE consent_records IS 'Immutable consent audit trail. One row per consent decision (accepted or declined); the latest row wins. PRD §9.2.';
 COMMENT ON COLUMN consent_records.consent_version IS 'Version string of the privacy notice/consent form accepted.';
 
 CREATE INDEX IF NOT EXISTS idx_consent_records_user_id ON consent_records (user_id);
