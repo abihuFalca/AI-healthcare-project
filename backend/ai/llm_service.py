@@ -28,7 +28,7 @@ class LLMService:
     Includes simple in-memory caching to reduce API calls.
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4-turbo"):
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """
         Initialize LLM service.
         
@@ -37,10 +37,15 @@ class LLMService:
             model: Model to use (default: gpt-4-turbo, fallback: gpt-3.5-turbo)
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model
+        self.model = model or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
         self.cache = {}  # Simple in-memory cache {hash(prompt): response}
         self.cache_ttl = 86400  # 24 hours
         
+        # Treat template values such as "sk-REPLACE_WITH_YOUR_KEY" as not configured
+        if self.api_key and any(m in self.api_key.upper() for m in ("REPLACE", "YOUR_", "CHANGEME")):
+            print("OPENAI_API_KEY looks like a placeholder; AI features are disabled until a real key is set.")
+            self.api_key = None
+
         if self.api_key and OPENAI_AVAILABLE:
             self.client = OpenAI(api_key=self.api_key)
             self.available = True
@@ -225,6 +230,139 @@ Plain-language explanation:
         
         return truncated.rstrip() + "."
     
+    # ------------------------------------------------------------------
+    # Shared helper
+    # ------------------------------------------------------------------
+    def _chat(self, messages: List[Dict[str, str]], max_tokens: int = 400,
+              temperature: float = 0.2, json_mode: bool = False) -> str:
+        """Single chat completion call with a short timeout. Raises on failure."""
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "timeout": 20,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        response = self.client.chat.completions.create(**kwargs)
+        return (response.choices[0].message.content or "").strip()
+
+    # ------------------------------------------------------------------
+    # 1. Smarter symptom reading (assists the rule-based NLP; never replaces it)
+    # ------------------------------------------------------------------
+    def extract_symptoms(self, text: str, allowed_symptoms: List[str]) -> List[str]:
+        """
+        Read free-text symptoms and map them onto the canonical symptom list.
+
+        Only names from `allowed_symptoms` are ever returned, and negated or
+        merely-mentioned symptoms are excluded. Returns [] when the LLM is
+        unavailable or anything goes wrong, so the rule-based parser result
+        always stands on its own.
+        """
+        if not self.available or not text or not text.strip():
+            return []
+
+        cache_key = f"symptoms:{text.strip().lower()}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+
+        system = (
+            "You map a patient's own description of their symptoms onto a fixed list of "
+            "canonical symptom names. Rules:\n"
+            "- Only use names exactly as written in the allowed list.\n"
+            "- Include a symptom only if the patient says they currently have it.\n"
+            "- Exclude anything denied or negated (e.g. 'no fever', 'not dizzy').\n"
+            "- Do not guess or infer diagnoses. If unsure, leave it out.\n"
+            'Respond with JSON only: {"symptoms": ["..."]}'
+        )
+        user = f"Allowed list: {json.dumps(allowed_symptoms)}\n\nPatient text: \"\"\"{text.strip()[:2000]}\"\"\""
+        try:
+            raw = self._chat(
+                [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                max_tokens=200, temperature=0, json_mode=True,
+            )
+            found = json.loads(raw).get("symptoms", [])
+            allowed = set(allowed_symptoms)
+            result = list(dict.fromkeys(s for s in found if isinstance(s, str) and s in allowed))
+            self._set_cached(cache_key, json.dumps(result))
+            return result
+        except Exception as e:
+            print(f"LLM symptom extraction error: {e}")
+            return []
+
+    # ------------------------------------------------------------------
+    # 2. Clinician case summary
+    # ------------------------------------------------------------------
+    def summarize_case(self, case: Dict[str, Any]) -> str:
+        """
+        Write a short structured summary of an assessment for a healthcare worker.
+        `case` holds the assessment facts already stored in the database.
+        """
+        if not self.available:
+            raise RuntimeError("LLM service not available")
+
+        cache_key = f"case:{case.get('assessment_id')}:{case.get('review_status')}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        system = (
+            "You are assisting a licensed clinician reviewing an AI triage assessment. "
+            "Write a concise case summary using only the facts provided. Never add findings, "
+            "test results or diagnoses that are not in the data. Use these headings, each with "
+            "1-3 short bullet points:\n"
+            "Presenting complaint\nKey vitals (flag abnormal values)\nRelevant history & risk factors\n"
+            "AI risk drivers\nSuggested points to check\n"
+            "Keep it under 180 words. Plain text, no markdown bold."
+        )
+        try:
+            result = self._chat(
+                [{"role": "system", "content": system},
+                 {"role": "user", "content": json.dumps(case, default=str)}],
+                max_tokens=450, temperature=0.2,
+            )
+            self._set_cached(cache_key, result)
+            return result
+        except Exception as e:
+            print(f"LLM case summary error: {e}")
+            raise
+
+    # ------------------------------------------------------------------
+    # 3. Patient assistant (questions about their own result)
+    # ------------------------------------------------------------------
+    def answer_patient_question(self, context: Dict[str, Any],
+                                history: List[Dict[str, str]], question: str) -> str:
+        """
+        Answer a patient's question about their assessment result in plain language.
+        The assistant explains; it never diagnoses, prescribes or changes the triage.
+        """
+        if not self.available:
+            raise RuntimeError("LLM service not available")
+
+        system = (
+            "You are a friendly assistant inside a health triage app. The patient has just "
+            "received an AI risk assessment, described in the JSON below. Help them understand "
+            "it.\nRules:\n"
+            "- Use simple words and short answers (under 120 words).\n"
+            "- Do not diagnose, name a likely disease, prescribe, or suggest medication doses.\n"
+            "- Never lower the urgency of the result or tell them to ignore it.\n"
+            "- If they describe worsening or emergency symptoms (chest pain, trouble breathing, "
+            "fainting, stroke signs, severe bleeding, thoughts of self-harm), tell them to call "
+            "local emergency services now.\n"
+            "- For decisions about treatment, tell them to speak with their doctor.\n"
+            "- If the question is unrelated to their health or this result, politely say you can "
+            "only help with their assessment.\n\n"
+            f"Assessment: {json.dumps(context, default=str)}"
+        )
+        messages = [{"role": "system", "content": system}]
+        for turn in history[-8:]:
+            if turn.get("role") in ("user", "assistant") and turn.get("content"):
+                messages.append({"role": turn["role"], "content": str(turn["content"])[:1500]})
+        messages.append({"role": "user", "content": question[:1500]})
+        return self._chat(messages, max_tokens=300, temperature=0.3)
+
     def health_check(self) -> Dict[str, Any]:
         """Check if LLM service is operational."""
         return {

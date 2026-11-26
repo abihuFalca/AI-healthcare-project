@@ -1,8 +1,9 @@
+import json
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from auth_utils import get_current_user
+from auth_utils import get_current_user, require_role, log_audit_event
 from ai.nlp import parse_free_text_symptoms
 from ai.risk_model import predict_patient_risk
 from ai.safety_rules import evaluate_safety_rules
@@ -141,3 +142,154 @@ def llm_health_check(user: dict = Depends(get_current_user)):
     """Check if LLM service is available."""
     llm = get_llm_service()
     return llm.health_check()
+
+
+# ============================================================================
+# Helpers for the LLM features below
+# ============================================================================
+
+def _load_assessment_facts(assessment_id: int) -> Dict[str, Any]:
+    """Load the stored facts of one assessment (no free-form AI output)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT a.*, p.user_id AS patient_user_id, p.gender, p.date_of_birth
+            FROM assessments a
+            JOIN patient_profiles p ON a.patient_id = p.id
+            WHERE a.id = %s
+        """, (assessment_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Assessment not found")
+        asm = dict(row)
+
+        cursor.execute("""
+            SELECT feature, contribution, explanation_text FROM ai_explanations
+            WHERE assessment_id = %s ORDER BY importance DESC NULLS LAST
+        """, (assessment_id,))
+        asm["factors"] = [dict(r) for r in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT review_status, final_triage_status, healthcare_worker_id
+            FROM healthcare_reviews WHERE assessment_id = %s
+        """, (assessment_id,))
+        r = cursor.fetchone()
+        asm["review"] = dict(r) if r else None
+        return asm
+    finally:
+        conn.close()
+
+
+def _parse_json_field(value):
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _case_facts(asm: Dict[str, Any]) -> Dict[str, Any]:
+    """The subset of an assessment that is shared with the LLM. No names or contact details."""
+    return {
+        "assessment_id": asm["id"],
+        "gender": asm.get("gender"),
+        "date_of_birth": str(asm.get("date_of_birth") or ""),
+        "symptom_text": asm.get("symptom_text"),
+        "symptoms": _parse_json_field(asm.get("symptoms_json")),
+        "duration": asm.get("duration"),
+        "severity": asm.get("severity"),
+        "medical_history": _parse_json_field(asm.get("history_snapshot")),
+        "medications": _parse_json_field(asm.get("medications_snapshot")),
+        "risk_factors": _parse_json_field(asm.get("risk_factors_snapshot")),
+        "vitals": _parse_json_field(asm.get("vitals_snapshot")),
+        "risk_score": asm.get("risk_score"),
+        "risk_level": asm.get("risk_level"),
+        "triage_level": asm.get("triage_level"),
+        "emergency_rules_triggered": _parse_json_field(asm.get("safety_rule_details")) if asm.get("safety_rule_triggered") else [],
+        "top_risk_factors": [
+            {"feature": f["feature"], "contribution": f["contribution"]} for f in asm.get("factors", [])[:5]
+        ],
+        "recommendation": asm.get("recommendation"),
+        "review_status": (asm.get("review") or {}).get("review_status"),
+    }
+
+
+def _require_llm():
+    llm = get_llm_service()
+    if not llm.available:
+        raise HTTPException(status_code=503, detail="AI features are not available right now (OPENAI_API_KEY not configured).")
+    return llm
+
+
+# ============================================================================
+# Doctor: AI case summary
+# ============================================================================
+
+@router.get("/case-summary/{assessment_id}")
+def get_case_summary(assessment_id: int, user: dict = Depends(require_role(["HEALTHCARE_WORKER", "ADMIN"]))):
+    """Short LLM-written clinical summary of an assessment for the reviewing clinician."""
+    llm = _require_llm()
+    asm = _load_assessment_facts(assessment_id)
+    try:
+        summary = llm.summarize_case(_case_facts(asm))
+    except Exception:
+        raise HTTPException(status_code=502, detail="The AI summary could not be generated. Please try again.")
+
+    log_audit_event(user["id"], "AI_CASE_SUMMARY_VIEWED", "ASSESSMENT", str(assessment_id), f"model={llm.model}")
+    return {
+        "assessment_id": assessment_id,
+        "summary": summary,
+        "model": llm.model,
+        "generated_at": datetime.now().isoformat(),
+        "disclaimer": "AI-generated from the recorded assessment. Verify against the source data before acting.",
+    }
+
+
+# ============================================================================
+# Patient: AI assistant about their own result
+# ============================================================================
+
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+class AssistantRequest(BaseModel):
+    assessment_id: int
+    message: str = Field(..., min_length=1, max_length=1500)
+    history: List[ChatTurn] = []
+
+EMERGENCY_PHRASES = [
+    "chest pain", "can't breathe", "cannot breathe", "trouble breathing", "difficulty breathing",
+    "passed out", "fainted", "unconscious", "stroke", "face drooping", "slurred speech",
+    "severe bleeding", "bleeding heavily", "suicide", "kill myself", "end my life", "self harm", "self-harm",
+]
+EMERGENCY_REPLY = (
+    "What you're describing could be an emergency. Please call your local emergency number "
+    "or go to the nearest emergency department right now. Don't wait for an online answer."
+)
+
+@router.post("/assistant")
+def ask_assistant(req: AssistantRequest, user: dict = Depends(require_role(["PATIENT"]))):
+    """Answers a patient's questions about their own assessment result."""
+    asm = _load_assessment_facts(req.assessment_id)
+    if asm["patient_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="You can only ask about your own assessments.")
+
+    # Deterministic emergency check first: never rely on the LLM for this
+    text = req.message.lower()
+    if any(p in text for p in EMERGENCY_PHRASES):
+        log_audit_event(user["id"], "AI_ASSISTANT_EMERGENCY_ESCALATION", "ASSESSMENT", str(req.assessment_id), "Emergency phrase detected")
+        return {"reply": EMERGENCY_REPLY, "emergency": True}
+
+    llm = _require_llm()
+    context = _case_facts(asm)
+    context.pop("date_of_birth", None)
+    try:
+        reply = llm.answer_patient_question(context, [t.dict() for t in req.history], req.message)
+    except Exception:
+        raise HTTPException(status_code=502, detail="The assistant couldn't answer just now. Please try again.")
+
+    log_audit_event(user["id"], "AI_ASSISTANT_QUESTION", "ASSESSMENT", str(req.assessment_id), f"model={llm.model}")
+    return {"reply": reply, "emergency": False}

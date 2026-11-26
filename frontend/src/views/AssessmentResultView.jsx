@@ -7,6 +7,7 @@ import RiskBadge from '../components/RiskBadge';
 import RiskScoreGauge from '../components/RiskScoreGauge';
 import ExplainabilityCard from '../components/ExplainabilityCard';
 import AssessmentExplanation from '../components/AssessmentExplanation';
+import PatientAssistant from '../components/PatientAssistant';
 
 export default function AssessmentResultView({ result, onBack, onNewAssessment }) {
   if (!result) return null;
@@ -208,6 +209,20 @@ export default function AssessmentResultView({ result, onBack, onNewAssessment }
           shapFeatures={result.factors}
           age={result.age}
           symptoms={result.combined_symptoms || result.symptoms_json}
+          token={localStorage.getItem('med_token')}
+        />
+
+        {/* Symptoms picked up by the AI reader that the keyword parser missed */}
+        {result.ai_extracted_symptoms?.length > 0 && (
+          <div className="card" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', color: '#334155' }}>
+            <strong>AI also noticed in your description:</strong> {result.ai_extracted_symptoms.join(', ')}.
+            These were included in your assessment.
+          </div>
+        )}
+
+        {/* Patient AI assistant: questions about this result */}
+        <PatientAssistant
+          assessmentId={result.assessment_id || result.id}
           token={localStorage.getItem('med_token')}
         />
 

@@ -6,7 +6,8 @@ from datetime import datetime
 from database import get_db
 from auth_utils import get_current_user, require_role, log_audit_event
 from ai.safety_rules import evaluate_safety_rules
-from ai.nlp import parse_free_text_symptoms
+from ai.nlp import parse_free_text_symptoms, CANONICAL_SYMPTOMS
+from ai.llm_service import get_llm_service
 from ai.risk_model import predict_patient_risk, MODEL_VERSION
 from ai.explainability import generate_shap_explanations
 from ai.recommendations import get_recommendation
@@ -126,7 +127,19 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
 
     # 2. Extract NLP symptoms from free text
     nlp_result = parse_free_text_symptoms(req.symptom_text or "")
-    combined_symptoms = list(dict.fromkeys((req.selected_symptoms or []) + nlp_result["extracted_symptoms"]))
+
+    # 2b. LLM-assisted symptom reading: catches wording the lexicon misses.
+    # It can only add symptoms from the canonical list (never remove), and the
+    # deterministic safety rules below still run on the combined set.
+    llm_symptoms = get_llm_service().extract_symptoms(req.symptom_text or "", list(CANONICAL_SYMPTOMS.keys()))
+    llm_only_symptoms = [
+        s for s in llm_symptoms
+        if s not in nlp_result["extracted_symptoms"] and s not in nlp_result["negated_symptoms"]
+    ]
+
+    combined_symptoms = list(dict.fromkeys(
+        (req.selected_symptoms or []) + nlp_result["extracted_symptoms"] + llm_only_symptoms
+    ))
     
     duration = req.duration if req.duration and req.duration != "Unknown" else nlp_result["duration"]
     severity = req.severity if req.severity and req.severity != "Unknown" else nlp_result["severity"]
@@ -265,7 +278,9 @@ def create_assessment(req: AssessmentCreateRequest, user: dict = Depends(require
         "model_version": MODEL_VERSION,
         "warnings": warnings,
         "extracted_symptoms": nlp_result["extracted_symptoms"],
+        "ai_extracted_symptoms": llm_only_symptoms,
         "combined_symptoms": combined_symptoms,
+        "age": req.age,
         "created_at": now_iso
     }
 

@@ -6,6 +6,7 @@ import {
 import RiskBadge from '../components/RiskBadge';
 import RiskScoreGauge from '../components/RiskScoreGauge';
 import ExplainabilityCard from '../components/ExplainabilityCard';
+import AiCaseSummary from '../components/AiCaseSummary';
 import { RiskTimelineChart, VitalTrendsChart } from '../components/Charts';
 
 export default function DoctorPatientReview({ patientId, assessmentId, token, onBack }) {
@@ -185,6 +186,9 @@ export default function DoctorPatientReview({ patientId, assessmentId, token, on
           </div>
         )}
       </div>
+
+      {/* LLM case summary for the reviewing clinician */}
+      {latestAsm && <AiCaseSummary assessmentId={latestAsm.id} token={token} />}
 
       {/* Explainable AI Factor Attribution (PRD 6.6) */}
       <div style={{ marginBottom: '1.5rem' }}>

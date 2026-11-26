@@ -22,3 +22,6 @@ backend/healthcare.db
 fastapi_pid.txt
 prd_content.txt
 extract_prd.py
+
+# Local scratch
+.scratch/
